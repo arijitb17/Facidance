@@ -450,13 +450,17 @@ async def recognize_faces(
             )
         results = resp.json()
  
+    # In recognize_faces(), around line 456
     recognized_ids: list[str] = results.get("recognizedStudents", [])
- 
+
     # Enrich recognised IDs with student names from DB
-    students = await prisma.student.find_many(
-        where={"id": {"in": recognized_ids}},
-        include={"user": True},
-    )
+    if recognized_ids:
+        students = await prisma.student.find_many(
+            where={"id": {"in": recognized_ids}},
+            include={"user": True},
+        )
+    else:
+        students = []   
     student_map = {s.id: {"name": s.user.name, "email": s.user.email} for s in students}
  
     enhanced = {
@@ -642,18 +646,17 @@ async def get_course_students(user_id: str, course_id: str) -> dict:
 
     student_ids = [r["student_id"] for r in rows]
 
-    # -------------------------------
-    # 3. Fetch students
-    # -------------------------------
-    students = await prisma.student.find_many(
-        where={"id": {"in": student_ids}},
-        include={
-            "user": True,
-            "program": {"include": {"department": True}},
-            "attendance": True,
-        },
-    )
-
+    if not student_ids:
+        students = []
+    else:
+        students = await prisma.student.find_many(
+            where={"id": {"in": student_ids}},
+            include={
+                "user": True,
+                "program": {"include": {"department": True}},
+                "attendance": True,
+            },
+        )
     # Sort in Python (ORM limitation)
     students = sorted(students, key=lambda s: s.user.name.lower())
 

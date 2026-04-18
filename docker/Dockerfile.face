@@ -1,0 +1,20 @@
+FROM python:3.11-slim AS base
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ cmake libpq-dev \
+    libopencv-dev libgl1 libglib2.0-0 \
+    libboost-all-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements-face.txt ./
+RUN pip install --no-cache-dir -r requirements-face.txt
+
+COPY backend/ ./backend/
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+EXPOSE 8004
+CMD ["uvicorn", "backend.scripts.face_service.main:app", "--host", "0.0.0.0", "--port", "8004"]

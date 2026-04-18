@@ -1,0 +1,225 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════
+#  Facidance — full-stack docker-compose
+#  Services: postgres · frontend · auth · admin · teacher
+#            · student · face · nginx
+# ═══════════════════════════════════════════════════════════════
+
+x-python-env: &python-env
+  DATABASE_URL: ${DATABASE_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  PYTHON_API_URL: ${PYTHON_API_URL:-http://face:8004}
+
+services:
+
+  # ─── Database ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-facidance}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # ─── Prisma migrate (runs once, then exits) ─────────────────
+  migrate:
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./prisma:/app/prisma
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: >
+      sh -c "apt-get update -y && apt-get install -y openssl &&
+            npm install -g prisma@5 &&
+            prisma migrate deploy --schema=/app/prisma/schema.prisma"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+  # ─── Auth service (port 8000) ────────────────────────────────
+  auth:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.auth
+    restart: unless-stopped
+    environment:
+      <<: *python-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Admin service (port 8001) ───────────────────────────────
+  admin:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.admin
+    restart: unless-stopped
+    environment:
+      <<: *python-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Teacher service (port 8002) ─────────────────────────────
+  teacher:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.teacher
+    restart: unless-stopped
+    environment:
+      <<: *python-env
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Student service (port 8003) ─────────────────────────────
+  student:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.student
+    restart: unless-stopped
+    environment:
+      <<: *python-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Face-recognition service (port 8004) ────────────────────
+  face:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.face
+    restart: unless-stopped
+    environment:
+      <<: *python-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/face_embeddings.pkl:/app/backend/face_embeddings.pkl
+      - ./backend/dataset:/app/backend/dataset
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Next.js frontend (port 3000) ────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_ADMIN_API_URL: ${NEXT_PUBLIC_ADMIN_API_URL}
+        NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+        NEXT_PUBLIC_TEACHER_API_URL: ${NEXT_PUBLIC_TEACHER_API_URL}
+        NEXT_PUBLIC_STUDENT_API_URL: ${NEXT_PUBLIC_STUDENT_API_URL}
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - admin
+      - teacher
+      - student
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Nginx reverse proxy + SSL (ports 80/443) ────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - auth
+      - admin
+      - teacher
+      - student
+      - face
+    networks:
+      - internal
+
+  # ─── Certbot (Let's Encrypt) — run manually first time ───────
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - internal
+
+# ═══════════════════════════════════════════════════════════════
+volumes:
+  postgres_data:
+  certbot_www:
+  certbot_certs:
+  face_embeddings:
+
+networks:
+  internal:
+    driver: bridge

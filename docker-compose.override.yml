@@ -1,0 +1,69 @@
+# ═══════════════════════════════════════════════════════════════
+#  docker-compose.override.yml — LOCAL DEV overrides
+#  Merges automatically with docker-compose.yml on `docker compose up`
+#  Do NOT commit real secrets here.
+# ═══════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+
+  # Expose Postgres to host for direct psql / DBeaver access
+  postgres:
+    ports:
+      - "5432:5432"
+
+  # Hot-reload for each FastAPI service
+  auth:
+    volumes:
+      - ./backend:/app/backend
+    command: uvicorn backend.auth.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+
+  admin:
+    volumes:
+      - ./backend:/app/backend
+    command: uvicorn backend.admin.main:app --host 0.0.0.0 --port 8001 --reload
+    ports:
+      - "8001:8001"
+
+  teacher:
+    volumes:
+      - ./backend:/app/backend
+    command: uvicorn backend.teacher.main:app --host 0.0.0.0 --port 8002 --reload
+    ports:
+      - "8002:8002"
+
+  student:
+    volumes:
+      - ./backend:/app/backend
+    command: uvicorn backend.student.main:app --host 0.0.0.0 --port 8003 --reload
+    ports:
+      - "8003:8003"
+
+  face:
+    volumes:
+      - ./backend:/app/backend
+    ports:
+      - "8004:8004"
+
+  # Next.js dev server with hot-reload instead of production build
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend.dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+
+  # Skip nginx in local dev — hit services directly
+  nginx:
+    profiles:
+      - nginx   # only starts when: docker compose --profile nginx up
