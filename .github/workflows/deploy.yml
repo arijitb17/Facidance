@@ -149,37 +149,29 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          IMAGE_BASE: ${{ env.IMAGE_BASE }}
         with:
           host:     ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key:      ${{ secrets.VPS_SSH_KEY }}
-          port:     ${{ secrets.VPS_PORT || 22 }}
+          port:     ${{ secrets.VPS_PORT }}
+          envs:     GHCR_TOKEN,GITHUB_ACTOR,IMAGE_BASE
           script: |
             set -e
             cd /opt/facidance
-
-            echo "── Pulling latest code ──"
             git pull origin main
 
-            echo "── Logging into GHCR ──"
-            echo "${{ secrets.GITHUB_TOKEN }}" | \
-              docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
-            echo "── Pulling new images ──"
-            IMAGE_BASE=${{ env.IMAGE_BASE }} \
-            docker compose -f docker-compose.prod.yml pull
+            IMAGE_BASE=$IMAGE_BASE docker compose -f docker-compose.prod.yml pull
+            IMAGE_BASE=$IMAGE_BASE docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            echo "── Restarting services (zero-downtime) ──"
-            IMAGE_BASE=${{ env.IMAGE_BASE }} \
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-            echo "── Pruning old images ──"
             docker image prune -f
-
             echo "✅ Deployment complete"
 
       - name: Notify on failure
         if: failure()
-        run: |
-          echo "❌ Deployment failed for commit ${{ github.sha }}"
-          # Add Slack/Discord webhook here if needed
+        run: echo "❌ Deployment failed for commit ${{ github.sha }}"
