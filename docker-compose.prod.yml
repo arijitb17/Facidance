@@ -127,6 +127,11 @@ services:
   frontend:
     image: ${IMAGE_BASE:-ghcr.io/arijitb17/facidance}-frontend:latest
     restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL}
+      NEXT_PUBLIC_ADMIN_API_URL: ${NEXT_PUBLIC_ADMIN_API_URL}
+      NEXT_PUBLIC_TEACHER_API_URL: ${NEXT_PUBLIC_TEACHER_API_URL}
+      NEXT_PUBLIC_STUDENT_API_URL: ${NEXT_PUBLIC_STUDENT_API_URL}
     depends_on: [auth, admin, teacher, student]
     networks: [internal]
 
