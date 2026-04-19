@@ -119,8 +119,6 @@ services:
         condition: service_healthy
       seed:
         condition: service_completed_successfully
-    volumes:
-      - face_embeddings:/app/backend/face_embeddings.pkl
     networks: [internal]
 
   frontend:
@@ -144,7 +142,6 @@ services:
 
 volumes:
   postgres_data:
-  face_embeddings:
 
 networks:
   internal:
