@@ -36,7 +36,8 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
     command: >
-      sh -c "npm install -g prisma &&
+      sh -c "apt-get update -y && apt-get install -y openssl &&
+             npm install -g prisma@5 &&
              prisma migrate deploy --schema=/app/prisma/schema.prisma"
     depends_on:
       postgres:
@@ -54,10 +55,9 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
     command: >
-      sh -c "
-        npm install -g prisma &&
-        node /app/prisma/seed.cjs
-      "
+      sh -c "apt-get update -y && apt-get install -y openssl &&
+             npm install -g prisma@5 &&
+             node /app/prisma/seed.cjs"
     depends_on:
       migrate:
         condition: service_completed_successfully
