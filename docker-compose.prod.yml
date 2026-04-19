@@ -48,7 +48,7 @@ services:
 
   seed:
     image: node:20-slim
-    working_dir: /app
+    working_dir: /app/prisma
     volumes:
       - ./prisma:/app/prisma
       - ./backend:/app/backend
@@ -56,10 +56,9 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     command: >
       sh -c "apt-get update -y && apt-get install -y openssl &&
-            cd /app/backend &&
             npm install &&
-            npx prisma generate --schema=/app/prisma/schema.prisma &&
-            node /app/prisma/seed.cjs"
+            npx prisma generate &&
+            node seed.cjs"
     depends_on:
       migrate:
         condition: service_completed_successfully
