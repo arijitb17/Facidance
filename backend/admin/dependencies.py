@@ -9,7 +9,7 @@ import os
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "changeme-use-env-in-production")

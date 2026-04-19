@@ -16,7 +16,6 @@ from insightface.app import FaceAnalysis
 import pickle
 import sys
 import psycopg2
-from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -99,7 +98,7 @@ def main():
         # Check if dataset exists
         if not os.path.exists(DATASET_PATH):
             print(f"Error: Dataset folder '{DATASET_PATH}' not found")
-            print(f"Please run photo.py first to capture student photos")
+            print("Please run photo.py first to capture student photos")
             sys.exit(1)
 
         # Initialize InsightFace ArcFace model
@@ -112,7 +111,6 @@ def main():
         embedding_vectors = []
         labels = []
         face_dict = {}
-        db_update_results = {}
         total_students = 0
         total_images_processed = 0
 
@@ -201,7 +199,7 @@ def main():
                                     embedding_vectors.append(emb_aug)
                                     labels.append(student_folder)
                                     
-                            except Exception as e:
+                            except Exception:
                                 continue
 
                 except Exception as e:
@@ -304,7 +302,7 @@ def create_enhanced_visualization(embedding_vectors, labels):
         colors = plt.cm.Set3(np.linspace(0, 1, len(unique_labels)))
         
         for i, label in enumerate(unique_labels):
-            mask = np.array([l == label for l in labels])
+            mask = np.array([label_item == label for label_item in labels])
             plt.scatter(
                 reduced_embeddings[mask, 0], 
                 reduced_embeddings[mask, 1],

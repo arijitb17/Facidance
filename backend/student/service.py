@@ -7,11 +7,8 @@ No HTTP concerns here — all DB access via prisma_client.prisma.
 
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from backend.common.prisma_client import prisma
 from backend.student.schemas import (

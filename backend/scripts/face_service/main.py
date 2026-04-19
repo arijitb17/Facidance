@@ -8,22 +8,17 @@ Start with:
     uvicorn backend.scripts.face_service.main:app --port 8000 --reload
 """
 
-import io
-import json
 import logging
 import os
 import pickle
 import shutil
 import sys
-import tempfile
 from contextlib import asynccontextmanager
-from typing import Optional
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(levelname)s: %(message)s")

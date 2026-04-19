@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import bcrypt
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from asyncpg.exceptions import UniqueViolationError
 
 from backend.common.prisma_client import prisma
@@ -599,7 +599,7 @@ async def graduate_student(user_id: str) -> dict:
     await prisma.student.update(
         where={"id": student.id}, data={"status": "graduated"}
     )
-    return {"message": f"Student marked as graduated"}
+    return {"message": "Student marked as graduated"}
 
 
 # ---------------------------------------------------------------------------

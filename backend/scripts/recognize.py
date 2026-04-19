@@ -52,7 +52,7 @@ def save_annotated_image(pil_image, faces, known_faces, image_name, confidence_t
         draw = ImageDraw.Draw(pil_image)
         try:
             font = ImageFont.truetype("arial.ttf", 20)
-        except:
+        except Exception:
             font = ImageFont.load_default()
         recognized = set()
         for idx, face in enumerate(faces):
@@ -66,7 +66,7 @@ def save_annotated_image(pil_image, faces, known_faces, image_name, confidence_t
                     sim = cosine_similarity(embedding, known_emb)
                     if sim > best_sim and sim > confidence_threshold and name not in recognized:
                         best_match, best_sim = name.title(), sim
-                except:
+                except Exception:
                     continue
             if best_match != "Unknown":
                 recognized.add(best_match.lower())

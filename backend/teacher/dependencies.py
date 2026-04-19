@@ -8,7 +8,7 @@ Reuses verify_token from backend.admin.dependencies.
 from typing import Annotated
 
 from fastapi import HTTPException, Security, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 
 from backend.admin.dependencies import bearer_scheme, verify_token
 

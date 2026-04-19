@@ -13,7 +13,6 @@ from backend.admin.dependencies import get_current_admin
 from backend.admin import service
 from backend.admin.schemas import (
     ApproveTeacherRequest,
-    ApproveTeacherResponse,
     CreateCourseRequest,
     CreateDepartmentRequest,
     CreateProgramRequest,

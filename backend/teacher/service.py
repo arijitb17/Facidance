@@ -8,21 +8,18 @@ Mirrors the logic in the Next.js teacher API routes.
 
 from __future__ import annotations
 
-import asyncio
 import os
 from datetime import datetime, timezone
 from typing import Optional
 
 import bcrypt
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from backend.common.prisma_client import prisma
 from backend.teacher.schemas import (
     GetStudentsRequest,
     ImportStudentsRequest,
-    RemoveStudentRequest,
     SubmitAttendanceRequest,
-    RunTrainingRequest,
     SendCredentialsRequest,
 )
 import httpx
@@ -1059,7 +1056,7 @@ async def send_credentials(data: SendCredentialsRequest) -> dict:
                 msg.attach(MIMEText(html, "html"))
                 server.sendmail(email_user, student.email, msg.as_string())
                 sent.append(student.email)
-            except Exception as exc:
+            except Exception:
                 failed.append(student.email)
 
     return {"success": True, "message": "Emails sent successfully", "sent": sent, "failed": failed}
