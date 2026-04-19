@@ -57,11 +57,15 @@ services:
     command: >
       sh -c "apt-get update -y && apt-get install -y openssl &&
              npm install -g prisma@5 &&
+             npm install @prisma/client@5 &&
+             prisma generate --schema=/app/prisma/schema.prisma &&
              node /app/prisma/seed.cjs"
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: "no"
+    networks:
+      - internal
 
   auth:
     image: ${IMAGE_BASE:-ghcr.io/arijitb17/facidance}-auth:latest
