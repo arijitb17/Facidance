@@ -8,9 +8,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BookOpen, ClipboardList, User, GraduationCap,
-  BarChart3, Target, CheckCircle2, TrendingUp,
-  TrendingDown, ArrowUpRight, Scan,
+  BookOpen, GraduationCap,
+  BarChart3, CheckCircle2, TrendingUp,
+  TrendingDown, ArrowUpRight,
 } from "lucide-react";
 import { useStudentStats } from "@/hooks/useStudent";
 
@@ -137,45 +137,6 @@ function Btn({ children, onClick, primary, small, style }: {
   );
 }
 
-function QuickActionCard({ label, desc, Icon, isHovered, onEnter, onLeave, onClick }: {
-  label: string; desc: string; Icon: React.ElementType;
-  isHovered: boolean; onEnter: () => void; onLeave: () => void; onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      style={{
-        display: "flex", flexDirection: "column", alignItems: "flex-start",
-        gap: 16, padding: "22px 20px", borderRadius: 16,
-        cursor: "pointer", textAlign: "left",
-        transform: isHovered ? "translateY(-5px) scale(1.02)" : "translateY(0) scale(1)",
-        transition: EASE_ALL,
-        background: isHovered ? ICON_GRAD : CARD_GRAD,
-        border: `1px solid ${isHovered ? "transparent" : C.border}`,
-        boxShadow: isHovered ? SHADOW.active : SHADOW.rest,
-        width: "100%",
-      }}
-    >
-      <div style={{
-        height: 42, width: 42, borderRadius: 12,
-        background: isHovered ? "rgba(255,255,255,0.18)" : "rgba(175,221,229,0.4)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: isHovered ? "0 4px 14px rgba(0,0,0,0.12)" : "none",
-        transform: isHovered ? "scale(1.1) rotate(-4deg)" : "scale(1) rotate(0deg)",
-        transition: EASE_ALL,
-      }}>
-        <Icon size={18} color={isHovered ? "#fff" : C.primary} strokeWidth={2} />
-      </div>
-      <div>
-        <p style={{ fontSize: 13.5, fontWeight: 700, color: isHovered ? "#fff" : C.text, letterSpacing: "-0.02em", transition: EASE_ALL }}>{label}</p>
-        <p style={{ fontSize: 12, marginTop: 3, color: isHovered ? "rgba(255,255,255,0.72)" : C.body, transition: EASE_ALL }}>{desc}</p>
-      </div>
-    </button>
-  );
-}
-
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
@@ -203,7 +164,6 @@ function CardHead({ title, sub, right }: { title: string; sub?: string; right?: 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function StudentDashboard() {
   const router = useRouter();
-  const [hoveredAction, setHoveredAction] = useState<string | null>(null);
   const { data: stats, loading, error } = useStudentStats();
 
   const totalCourses    = stats?.total_courses ?? 0;
@@ -216,12 +176,6 @@ export default function StudentDashboard() {
     { title: "Classes Attended", value: totalPresent,               Icon: CheckCircle2,  trend: undefined,       trendLabel: undefined },
   ];
 
-  const quickActions = [
-    { label: "My Courses",          desc: "Browse enrolled courses",     Icon: BookOpen,     href: "/student/courses"  },
-    { label: "Attendance History",  desc: "Review past sessions",        Icon: ClipboardList, href: "/student/history" },
-    { label: "My Profile",          desc: "Manage face recognition",     Icon: User,          href: "/student/profile" },
-    { label: "Reports",             desc: "Analytics & insights",        Icon: BarChart3,     href: "/student/history" },
-  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>

@@ -63,9 +63,22 @@ export function generateToken(payload: { id: string; role: string }): string {
  */
 export function verifyToken(token: string): { id: string; role: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
-    return decoded;
-  } catch (error) {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (
+      typeof decoded === "object" &&
+      decoded !== null &&
+      "id" in decoded &&
+      "role" in decoded
+    ) {
+      return {
+        id: String((decoded as any).id),
+        role: String((decoded as any).role),
+      };
+    }
+
+    return null;
+  } catch {
     return null;
   }
 }

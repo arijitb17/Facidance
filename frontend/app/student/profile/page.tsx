@@ -8,11 +8,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Camera, Upload, CheckCircle2, AlertCircle,
-  User, Mail, Book, Calendar, Building, Loader,
+  User, Mail, Book, Calendar, Building,
   UserCheck,
 } from "lucide-react";
 import { useStudentMe, useCheckPhotos, useUploadPhotos } from "@/hooks/useStudent";
-
+import Image from "next/image";
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const SPRING   = "cubic-bezier(.22,.68,0,1.2)";
 const EASE_ALL = `all 0.25s ${SPRING}`;
@@ -374,7 +374,7 @@ export default function StudentProfilePage() {
 
             {/* Pose cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }} className="pose-grid">
-              {POSES.map(({ key, label, instruction, emoji }) => (
+              {POSES.map(({ key, label, instruction }) => (
                 <div key={key} style={{
                   borderRadius: 16, border: `1px solid ${previews[key] ? C.borderHov : C.border}`,
                   padding: "16px",
@@ -391,7 +391,12 @@ export default function StudentProfilePage() {
                   {previews[key] ? (
                     <div style={{ position: "relative" }}>
                       <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 10, overflow: "hidden", background: "#f1f5f9" }}>
-                        <img src={previews[key]!} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        <Image
+  src={previews[key]!}
+  alt={label}
+  fill
+  style={{ objectFit: "cover" }}
+/>
                       </div>
                       <button
                         onClick={() => removePhoto(key)}

@@ -96,7 +96,6 @@ const C = {
 // Exact same gradients as teacher dashboard
 const ICON_GRAD   = `linear-gradient(135deg, ${C.primary} 0%, ${C.accent} 100%)`;
 const CARD_GRAD   = "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)";
-const ACTIVE_GRAD = "linear-gradient(135deg, #003135 0%, #024950 50%, #0FA4AF 100%)";
 
 const SHADOW = {
   rest:   "0 2px 12px rgba(0,49,53,0.06)",

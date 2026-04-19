@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, FileSpreadsheet, BarChart3, TrendingUp, TrendingDown, Users, AlertCircle, ChevronDown } from "lucide-react";
+import { Download, FileSpreadsheet, TrendingUp, TrendingDown, Users, AlertCircle, ChevronDown } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip,
   PieChart, Pie, Cell, CartesianGrid,

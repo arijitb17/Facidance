@@ -111,9 +111,10 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token ?? "");
       toast.success("Welcome back!", "Redirecting to your dashboard…");
       setTimeout(() => router.push(data.redirect_url ?? "/"), 1000);
-    } catch {
-      toast.error("Connection error", "Could not reach the server. Please try again.");
-    } finally {
+    } catch (err) {
+  console.error(err);
+  toast.error("Connection error", "Could not reach the server. Please try again.");
+} finally {
       setLoading(false);
     }
   }

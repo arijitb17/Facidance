@@ -5,7 +5,7 @@
  * Student shell — uses the unified <Navbar role="student" /> component.
  */
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GraduationCap } from "lucide-react";
 import { getMe } from "@/lib/api_student";
@@ -18,7 +18,6 @@ const MUTED_LIGHT = "#94a3b8";
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
-  const pathname = usePathname();
   const [studentName, setStudentName] = useState<string>("Student");
   const [ready,       setReady]       = useState(false);
 

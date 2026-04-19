@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BookOpen, Building2, CalendarDays, KeyRound,
-  GraduationCap, CheckCircle2, Search, ArrowUpRight,
-  Users, Layers, X,
+  BookOpen, Building2, CalendarDays, KeyRound, Search, ArrowUpRight, X,
 } from "lucide-react";
 import { teacherCoursesApi, type TeacherCourse } from "@/lib/teacher-api";
 
@@ -43,49 +41,8 @@ function slugifyCourseName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
 // ─── Components ───────────────────────────────────────────────────────────────
-function Btn({
-  children, onClick, primary, small, style,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  primary?: boolean;
-  small?: boolean;
-  style?: React.CSSProperties;
-}) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        display: "inline-flex", alignItems: "center", gap: 7,
-        padding: small ? "6px 13px" : "9px 18px",
-        borderRadius: 11, fontSize: small ? 12 : 13, fontWeight: 600,
-        cursor: "pointer", letterSpacing: "-0.01em",
-        transform: hov ? "translateY(-2px) scale(1.01)" : "translateY(0) scale(1)",
-        transition: EASE_ALL,
-        ...(primary ? {
-          background: ICON_GRAD, color: "#fff", border: "none",
-          boxShadow: hov ? SHADOW.active : `0 8px 24px rgba(15,164,175,0.35)`,
-        } : {
-          background: hov ? "#f0f9fa" : C.white,
-          color: hov ? C.primary : C.textSoft,
-          border: `1px solid ${hov ? C.borderHov : C.border}`,
-          boxShadow: hov ? SHADOW.hover : SHADOW.rest,
-        }),
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+
 
 function StatPill({ value, label, color }: { value: number | string; label: string; color: string }) {
   return (

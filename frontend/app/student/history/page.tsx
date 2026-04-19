@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import {
   Calendar, Download, Search, CheckCircle2, XCircle,
-  TrendingUp, TrendingDown, BarChart3, AlertCircle, X,
+  TrendingUp, TrendingDown, AlertCircle, X,
 } from "lucide-react";
 import { useAttendanceHistory } from "@/hooks/useStudent";
 
@@ -134,7 +134,9 @@ export default function AttendanceHistoryPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "records">("overview");
 
   const records = data?.records ?? [];
-  const summary = data?.summary ?? [];
+ const summary = useMemo(() => {
+  return data?.summary ?? [];
+}, [data]);
 
   const filteredRecords = records.filter((r) => {
     const matchesFilter = filter === "all" || (filter === "present" && r.status) || (filter === "absent" && !r.status);

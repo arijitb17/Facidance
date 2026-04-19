@@ -49,6 +49,24 @@ services:
     networks:
       - internal
     restart: "no"
+
+  seed:
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./prisma:/app/prisma
+      - ./backend:/app/backend 
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: >
+      sh -c "
+        npm install -g prisma &&
+        node /app/prisma/seed.cjs
+      "
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
   # ─── Auth service (port 8000) ────────────────────────────────
   auth:
     build:
@@ -60,7 +78,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
+      seed:
         condition: service_completed_successfully
     networks:
       - internal
@@ -81,7 +99,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
+      seed:
         condition: service_completed_successfully
     networks:
       - internal
@@ -104,7 +122,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
+      seed:
         condition: service_completed_successfully
     networks:
       - internal
@@ -125,7 +143,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migrate:
+      seed:
         condition: service_completed_successfully
     networks:
       - internal
@@ -146,6 +164,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     volumes:
       - ./backend/face_embeddings.pkl:/app/backend/face_embeddings.pkl
       - ./backend/dataset:/app/backend/dataset

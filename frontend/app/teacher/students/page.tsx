@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
@@ -192,47 +192,64 @@ export default function TeacherStudents() {
   const [selectedCourseFilter, setSelectedCourseFilter] = useState("");
   const { toasts, toast, removeToast } = useToast();
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchData = useCallback(async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    const token = localStorage.getItem("token");
+    if (!token) { setError("Not authenticated."); router.push("/login"); return; }
 
-  async function fetchData() {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem("token");
-      if (!token) { setError("Not authenticated."); router.push("/login"); return; }
+    const [studentsData, coursesData, programsRes] = await Promise.all([
+      teacherStudentsApi.list(),
+      teacherCoursesApi.list(),
+      fetch("/api/programs", { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+    const programsData = programsRes.ok ? await programsRes.json() : [];
 
-      const [studentsData, coursesData, programsRes] = await Promise.all([
-        teacherStudentsApi.list(),
-        teacherCoursesApi.list(),
-        fetch("/api/programs", { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-      const programsData = programsRes.ok ? await programsRes.json() : [];
+    setStudents(studentsData.map((s) => ({
+      id: s.id,
+      user: s.user,
+      program: {
+        name: s.program?.name ?? "N/A",
+        department: { name: s.program?.department?.name ?? "N/A" },
+      },
+      faceEmbedding: s.faceEmbedding,
+      _count: { courses: s._count.courses, attendance: s._count.attendance },
+      courses: s.courses,
+    })));
 
-      setStudents(studentsData.map((s) => ({
-        id: s.id, user: s.user,
-        program: { name: s.program?.name ?? "N/A", department: { name: s.program?.department?.name ?? "N/A" } },
-        faceEmbedding: s.faceEmbedding,
-        _count: { courses: s._count.courses, attendance: s._count.attendance },
-        courses: s.courses,
-      })));
-      setCourses(coursesData.map((c) => ({
-        id: c.id, name: c.name, entryCode: c.entry_code,
-        _count: { students: c.student_count, attendance: c.session_count },
-      })));
-      setPrograms(programsData);
-    } catch (err: any) {
-      setError(err.message || "Failed to load data");
-    } finally {
-      setLoading(false);
-    }
+    setCourses(coursesData.map((c) => ({
+      id: c.id,
+      name: c.name,
+      entryCode: c.entry_code,
+      _count: { students: c.student_count, attendance: c.session_count },
+    })));
+
+    setPrograms(programsData);
+  } catch (err: unknown) {
+  const message = err instanceof Error ? err.message : "Failed to load data";
+  setError(message);
+} finally {
+    setLoading(false);
   }
+}, [router]);
 
-  const filteredStudents = students
+const filteredStudents = useMemo(() => {
+  return students
     .filter((s) => {
       const q = searchTerm.toLowerCase();
-      return s.user.name.toLowerCase().includes(q) || s.user.email.toLowerCase().includes(q) || s.program.name.toLowerCase().includes(q);
+      return (
+        s.user.name.toLowerCase().includes(q) ||
+        s.user.email.toLowerCase().includes(q) ||
+        s.program.name.toLowerCase().includes(q)
+      );
     })
-    .filter((s) => !selectedCourseFilter || s.courses?.some((c) => c.id === selectedCourseFilter));
+    .filter(
+      (s) =>
+        !selectedCourseFilter ||
+        s.courses?.some((c) => c.id === selectedCourseFilter)
+    );
+}, [students, searchTerm, selectedCourseFilter]);
 
   async function handleImport(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -253,7 +270,10 @@ export default function TeacherStudents() {
 
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const sheetName = workbook.SheetNames[0];
+if (!sheetName) throw new Error("Invalid Excel file");
+
+const firstSheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
 
       const studentsToImport: { name: string; email: string; dob: string; program_id: string }[] = [];
@@ -272,9 +292,17 @@ export default function TeacherStudents() {
         } else {
           const parts = String(dob).trim().replace(/\//g, "-").split("-");
           if (parts.length !== 3) continue;
-          let [day, month, year] = parts;
-          if (year.length === 2) year = String(Math.floor(new Date().getFullYear() / 100) * 100 + parseInt(year));
-          parsedDob = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+         const [day, month, yearRaw] = parts;
+
+let year = yearRaw;
+
+if (year.length === 2) {
+  year = String(
+    Math.floor(new Date().getFullYear() / 100) * 100 + parseInt(year)
+  );
+}
+
+parsedDob = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
         }
         studentsToImport.push({ name: String(name).trim(), email: studentEmail.toLowerCase().trim(), dob: parsedDob, program_id: programId });
       }

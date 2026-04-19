@@ -1,6 +1,7 @@
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
+import unusedImports from "eslint-plugin-unused-imports";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -10,11 +11,9 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  // Extend Next.js defaults
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 
   {
-    // 🔒 Ignore generated and build folders
     ignores: [
       "node_modules/**",
       ".next/**",
@@ -23,17 +22,38 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
 
-    // ✅ Custom rule overrides
-    rules: {
-      // Disable "no explicit any" globally — harmless and common for dynamic data
-      "@typescript-eslint/no-explicit-any": "off",
+    plugins: {
+      "unused-imports": unusedImports,
+    },
 
-      // Optional: reduce noise from prop spreading, unused vars, etc.
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
       "react/prop-types": "off",
-      "no-unused-vars": "warn",
       "react-hooks/exhaustive-deps": "warn",
+
+      // 🔥 auto remove unused imports
+      "unused-imports/no-unused-imports": "error",
+
+      // better unused vars handling
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_" }
+      ],
+
+      // disable annoying ones
+      "react/no-unescaped-entities": "off",
+      "@typescript-eslint/triple-slash-reference": "off",
+
+      "@typescript-eslint/no-unused-expressions": "warn",
+      "@typescript-eslint/triple-slash-reference": "off",
     },
   },
+  {
+  files: ["next-env.d.ts"],
+  rules: {
+    "@typescript-eslint/triple-slash-reference": "off",
+  },
+}
 ];
 
 export default eslintConfig;

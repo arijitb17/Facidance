@@ -95,7 +95,13 @@ function buildTrend(attendanceByDate: Record<string, { status: boolean }[]>) {
   Object.entries(attendanceByDate).forEach(([dateKey, records]) => {
     const m = MONTH_NAMES[new Date(dateKey).getMonth()];
     if (!map[m]) map[m] = { present: 0, absent: 0 };
-    records.forEach((r) => { r.status ? map[m].present++ : map[m].absent++; });
+    records.forEach((r) => {
+  if (r.status) {
+    map[m].present++;
+  } else {
+    map[m].absent++;
+  }
+});
   });
   return Object.entries(map).map(([month, v]) => ({ month, ...v }));
 }

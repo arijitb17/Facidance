@@ -9,8 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   BookOpen, User, Calendar, ArrowLeft, CheckCircle2,
-  XCircle, Clock, TrendingUp, Mail, GraduationCap,
-  Info, Award, BarChart3,
+  XCircle, Mail, GraduationCap,
+  Info, Award,
 } from "lucide-react";
 import {
   listCourses, getCourse, getCourseAttendance,
@@ -55,8 +55,8 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-function CardHead({ title, sub, Icon, iconColor }: {
-  title: string; sub?: string; Icon: React.ElementType; iconColor?: string;
+function CardHead({ title, sub, Icon }: {
+  title: string; sub?: string; Icon: React.ElementType;
 }) {
   return (
     <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 20 }}>

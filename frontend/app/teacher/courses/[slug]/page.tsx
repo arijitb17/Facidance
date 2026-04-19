@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import {
   BookOpen, Building2, CalendarDays, GraduationCap,
   CheckCircle2, Search, Download, ArrowLeft,
-  UserCheck, UserX, Clock, X, TrendingUp,
+  UserCheck, UserX, X, TrendingUp,
 } from "lucide-react";
 import { teacherCoursesApi, type TeacherCourse, type CourseStudentItem } from "@/lib/teacher-api";
 
@@ -108,13 +108,11 @@ interface StatCardProps {
   title: string;
   value: number | string;
   Icon: React.ElementType;
-  accent?: string;
   sub?: string;
 }
 
-function StatCard({ title, value, Icon, accent, sub }: StatCardProps) {
+function StatCard({ title, value, Icon,  sub }: StatCardProps) {
   const [hov, setHov] = useState(false);
-  const color = accent ?? C.accent;
   return (
     <div
       onMouseEnter={() => setHov(true)}

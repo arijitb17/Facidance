@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  AnalyticsOverview, AttendanceTrend, Course, Department, Program,
-  Student, Teacher, TeacherLoad, ProgramDistribution, AdminStats,
+  AnalyticsOverview, AdminStats,
   analyticsApi, coursesApi, departmentsApi, programsApi,
   statsApi, studentsApi, teachersApi,
 } from "@/lib/api";

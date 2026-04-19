@@ -64,6 +64,12 @@ function generateClassDates() {
 }
 
 async function main() {
+    const existing = await prisma.attendance.findFirst();
+
+  if (existing) {
+    console.log("⚠️ Seed already ran. Skipping...");
+    return;
+  }
   console.log("📌 Seeding attendance records...");
   console.log("📅 Period: Nov 10 - Nov 30, 2024 (Mon/Wed/Fri)");
   
