@@ -15,12 +15,15 @@ const eslintConfig = [
 
   {
     ignores: [
-      "node_modules/**",
-      ".next/**",
-      "out/**",
-      "build/**",
-      "next-env.d.ts",
-    ],
+  "**/.next/**",
+  ".next/**",
+  "node_modules/**",
+  "**/node_modules/**",
+  "dist/**",
+  "build/**",
+  "out/**",
+  "next-env.d.ts",
+],
 
     plugins: {
       "unused-imports": unusedImports,

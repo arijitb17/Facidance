@@ -7,12 +7,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { GraduationCap } from "lucide-react";
 import { getMe } from "@/lib/api_student";
 import Navbar from "@/components/Navbar"; // ← adjust path to wherever you placed the unified Navbar
+import Image from "next/image";
 
-const ICON_GRAD   = "linear-gradient(135deg, #003135 0%, #0FA4AF 100%)";
-const ACCENT      = "#0FA4AF";
 const PRIMARY     = "#003135";
 const MUTED_LIGHT = "#94a3b8";
 
@@ -52,31 +50,65 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         </div>
 
         {/* Spinner */}
-        <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-          <div style={{ position: "relative", width: 56, height: 56, margin: "0 auto 16px" }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              border: "2px solid rgba(15,164,175,0.12)",
-              borderTopColor: ACCENT,
-              animation: "spin 0.9s linear infinite",
-              position: "absolute", inset: 0,
-            }} />
-            <div style={{
-              position: "absolute", inset: 8, borderRadius: "50%",
-              background: ICON_GRAD,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <GraduationCap size={18} color="#fff" />
-            </div>
-          </div>
-          <p style={{ fontSize: 14, fontWeight: 600, color: PRIMARY, letterSpacing: "-0.01em" }}>
-            Facidance
-          </p>
-          <p style={{ fontSize: 12, color: MUTED_LIGHT, marginTop: 4 }}>
-            Loading your portal…
-          </p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        {/* Logo Loader */}
+<div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+  <div style={{
+    position: "relative",
+    width: 72,
+    height: 72,
+    margin: "0 auto 18px",
+  }}>
+
+    {/* Glow */}
+    <div style={{
+      position: "absolute",
+      inset: 0,
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(15,164,175,0.25), transparent 70%)",
+      filter: "blur(14px)",
+    }} />
+
+    {/* Logo */}
+    <Image
+  src="/logo.png"
+  alt="Facidance"
+  width={72}
+  height={72}
+  style={{
+    objectFit: "contain",
+    animation: "logoSpin 2.2s linear infinite, logoPulse 1.8s ease-in-out infinite",
+  }}
+/>
+  </div>
+
+  <p style={{
+    fontSize: 14,
+    fontWeight: 600,
+    color: PRIMARY,
+    letterSpacing: "-0.01em",
+  }}>
+    Facidance
+  </p>
+
+  <p style={{
+    fontSize: 12,
+    color: MUTED_LIGHT,
+    marginTop: 4,
+  }}>
+    Loading your portal…
+  </p>
+</div>
+        <style>{`
+  @keyframes logoSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes logoPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.08); opacity: 0.85; }
+  }
+`}</style>
       </div>
     );
   }

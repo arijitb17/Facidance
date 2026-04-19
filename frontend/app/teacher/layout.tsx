@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import QueryProvider from "./query-provider";
-
+import Image from "next/image";
 function TeacherLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -40,38 +40,67 @@ function TeacherLayoutInner({ children }: { children: React.ReactNode }) {
           }} />
         </div>
 
-        <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-          {/* Logo spinner */}
-          <div style={{ position: "relative", width: 56, height: 56, margin: "0 auto 16px" }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              border: "2px solid rgba(15,164,175,0.12)",
-              borderTopColor: "#0FA4AF",
-              animation: "spin 0.9s linear infinite",
-              position: "absolute", inset: 0,
-            }} />
-            <div style={{
-              position: "absolute", inset: 8,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #003135 0%, #0FA4AF 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 13, fontWeight: 800,
-            }}>
-              F
-            </div>
-          </div>
+        {/* Logo Loader */}
+<div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+  <div style={{
+    position: "relative",
+    width: 72,
+    height: 72,
+    margin: "0 auto 18px",
+  }}>
 
-          <p style={{
-            fontSize: 14, fontWeight: 600,
-            color: "#003135", letterSpacing: "-0.01em",
-          }}>
-            Facidance
-          </p>
-          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-            Loading your dashboard…
-          </p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    {/* Glow */}
+    <div style={{
+      position: "absolute",
+      inset: 0,
+      borderRadius: "50%",
+      background: "radial-gradient(circle, rgba(15,164,175,0.25), transparent 70%)",
+      filter: "blur(14px)",
+    }} />
+
+    {/* Logo */}
+    
+
+<Image
+  src="/logo.png"
+  alt="Facidance"
+  width={72}
+  height={72}
+  style={{
+    objectFit: "contain",
+    animation: "logoSpin 2.2s linear infinite, logoPulse 1.8s ease-in-out infinite",
+  }}
+/>
+  </div>
+
+  <p style={{
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#003135",
+    letterSpacing: "-0.01em",
+  }}>
+    Facidance
+  </p>
+
+  <p style={{
+    fontSize: 12,
+    color: "#94a3b8",
+    marginTop: 4,
+  }}>
+    Loading your dashboard…
+  </p>
+</div>
+ <style>{`
+  @keyframes logoSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes logoPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.08); opacity: 0.85; }
+  }
+`}</style>
       </div>
     );
   }

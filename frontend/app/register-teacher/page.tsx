@@ -268,9 +268,9 @@ export default function RegisterTeacherPage() {
             paddingTop: 24,
           }}>
             {[
-              { val: "2,400+", lbl: "Students" },
+              { val: "1500+", lbl: "Students" },
               { val: "98.2%",  lbl: "Accuracy" },
-              { val: "120+",   lbl: "Courses"  },
+              { val: "10+",   lbl: "Courses"  },
             ].map(({ val, lbl }, i, arr) => (
               <div key={lbl} style={{
                 flex: 1, textAlign: "center",

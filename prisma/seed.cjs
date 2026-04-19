@@ -150,7 +150,7 @@ const teacherUsers = [
   const studentData = [
     { id: "cmjmoth65000huw68ccd5lcum", name: "Arjun Gautam Baruah", email: "arjun.baruah@gauhati.ac.in", programId: progBTechCSE.id },
     { id: "cmjmoti6n000kuw6833e9g8fr", name: "Shubrajit Deb", email: "shubrajit.deb@gauhati.ac.in", programId: progBTechCSE.id },
-    { id: "cmjmotirp000nuw68id39qyhh", name: "Monaswi Kumar Bharali", email: "monaswi.bharali@gauhati.ac.in", programId: progBTechCSE.id },
+    { id: "cmjmotirp000nuw68id39qyhh", name: "Monaswi Kumar Bharadwaj", email: "monaswi.bharadwaj@gauhati.ac.in", programId: progBTechCSE.id },
     { id: "cmjmotjb8000quw68xhfdwm78", name: "Liza Kalita", email: "liza.kalita@gauhati.ac.in", programId: progBTechCSE.id },
     { id: "cmjmotjvx000tuw68op9coyz1", name: "Bikash Nath", email: "bikash.nath@gauhati.ac.in", programId: progBTechCSE.id },
     { id: "cmjmotkfp000wuw68qz9bsq2s", name: "Sikhar Kashyap Jyoti", email: "sikhar.jyoti@gauhati.ac.in", programId: progBTechCSE.id },

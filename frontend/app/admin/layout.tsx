@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import AdminQueryProvider from "./admin-query-provider";
-
+import Image from "next/image";
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -27,54 +27,65 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (!ready) {
     return (
       <div style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e8eef4 100%)",
-      }}>
-        {/* Subtle background orbs */}
-        <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-          <div style={{
-            position: "absolute", top: "20%", left: "30%",
-            width: 500, height: 500, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(71,85,105,0.06) 0%, transparent 70%)",
-          }} />
-          <div style={{
-            position: "absolute", bottom: "20%", right: "25%",
-            width: 400, height: 400, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(30,41,59,0.04) 0%, transparent 70%)",
-          }} />
-        </div>
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e8eef4 100%)",
+}}>
+  <div style={{ textAlign: "center" }}>
 
-        <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-          <div style={{ position: "relative", width: 56, height: 56, margin: "0 auto 16px" }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              border: "2px solid rgba(71,85,105,0.12)",
-              borderTopColor: "#475569",
-              animation: "spin 0.9s linear infinite",
-              position: "absolute", inset: 0,
-            }} />
-            <div style={{
-              position: "absolute", inset: 8,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #1e293b 0%, #475569 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: 13, fontWeight: 800,
-            }}>
-              A
-            </div>
-          </div>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1e293b", letterSpacing: "-0.01em" }}>
-            Facidance Admin
-          </p>
-          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-            Loading admin portal…
-          </p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
+    {/* LOGO ANIMATION */}
+    <div style={{
+      width: 72,
+      height: 72,
+      margin: "0 auto 18px",
+      position: "relative",
+    }}>
+      <Image
+  src="/logo.png"
+  alt="Facidance"
+  width={72}
+  height={72}
+  style={{
+    objectFit: "contain",
+    animation: "logoSpin 2.2s linear infinite, logoPulse 1.8s ease-in-out infinite",
+  }}
+/>
+    </div>
+
+    {/* TEXT */}
+    <p style={{
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#1e293b",
+      letterSpacing: "-0.01em",
+    }}>
+      Facidance Admin
+    </p>
+
+    <p style={{
+      fontSize: 12,
+      color: "#94a3b8",
+      marginTop: 4,
+    }}>
+      Initializing secure session…
+    </p>
+  </div>
+
+  {/* ANIMATIONS */}
+  <style>{`
+    @keyframes logoSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.85; }
+    }
+  `}</style>
+</div>
     );
   }
 

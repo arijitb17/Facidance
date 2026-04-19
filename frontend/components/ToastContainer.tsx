@@ -1,4 +1,4 @@
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from "lucide-react";
 
 export type ToastType = "success" | "error" | "info" | "warning";
@@ -16,7 +16,7 @@ interface ToastProps {
   onClose: (id: string) => void;
 }
 
-export default function ToastItem({ toast, onClose }: ToastProps) {
+export function ToastItem({ toast, onClose }: ToastProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -78,10 +78,10 @@ export default function ToastItem({ toast, onClose }: ToastProps) {
         background: `linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)`,
         border: `1px solid rgba(0,0,0,0.06)`,
         boxShadow: `
-  0 16px 40px rgba(0,49,53,0.16),
-  0 0 0 1px ${c.bg},
-  inset 0 1px 0 rgba(255,255,255,0.7)
-`,
+          0 16px 40px rgba(0,49,53,0.16),
+          0 0 0 1px ${c.bg},
+          inset 0 1px 0 rgba(255,255,255,0.7)
+        `,
         display: "flex",
         gap: 12,
         alignItems: "flex-start",
@@ -139,28 +139,28 @@ export default function ToastItem({ toast, onClose }: ToastProps) {
       </div>
 
       {/* CLOSE */}
-     <button
-  onClick={() => onClose(toast.id)}
-  style={{
-    opacity: 0.5,
-    background: "transparent",
-    border: "none",
-    color: "#64748b",
-    cursor: "pointer",
-    padding: 4,
-    borderRadius: 6,
-  }}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.opacity = "1";
-    e.currentTarget.style.background = "rgba(0,0,0,0.05)";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.opacity = "0.5";
-    e.currentTarget.style.background = "transparent";
-  }}
->
-  <X size={14} />
-</button>
+      <button
+        onClick={() => onClose(toast.id)}
+        style={{
+          opacity: 0.5,
+          background: "transparent",
+          border: "none",
+          color: "#64748b",
+          cursor: "pointer",
+          padding: 4,
+          borderRadius: 6,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = "1";
+          e.currentTarget.style.background = "rgba(0,0,0,0.05)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "0.5";
+          e.currentTarget.style.background = "transparent";
+        }}
+      >
+        <X size={14} />
+      </button>
     </div>
   );
 }
@@ -168,15 +168,17 @@ export default function ToastItem({ toast, onClose }: ToastProps) {
 export function ToastContainer({
   toasts,
   onClose,
+  offsetTop = 80, // 👈 default for pages WITH navbar
 }: {
   toasts: Toast[];
   onClose: (id: string) => void;
+  offsetTop?: number;
 }) {
   return (
     <div
       style={{
         position: "fixed",
-        top: 80,
+        top: offsetTop, // 👈 dynamic position
         right: 24,
         zIndex: 9999,
         pointerEvents: "none",
