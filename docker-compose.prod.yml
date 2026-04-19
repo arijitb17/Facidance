@@ -56,10 +56,10 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     command: >
       sh -c "apt-get update -y && apt-get install -y openssl &&
-             npm install -g prisma@5 &&
-             npm install @prisma/client@5 &&
-             prisma generate --schema=/app/prisma/schema.prisma &&
-             node /app/prisma/seed.cjs"
+            cd /app/backend &&
+            npm install &&
+            npx prisma generate --schema=/app/prisma/schema.prisma &&
+            node /app/prisma/seed.cjs"
     depends_on:
       migrate:
         condition: service_completed_successfully
