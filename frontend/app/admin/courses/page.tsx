@@ -202,7 +202,17 @@ export default function CoursesPage() {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>Courses</h1>
           <p style={{ fontSize: 13, color: C.body, marginTop: 3, marginBottom: 0 }}>Manage academic courses — teachers, programs, semesters.</p>

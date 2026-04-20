@@ -311,7 +311,17 @@ export default function TeacherReports() {
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
       {/* Header */}
-      <div style={{ padding: "4px 0 8px" }}>
+                  <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
           Attendance Reports
         </h1>

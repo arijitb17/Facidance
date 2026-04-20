@@ -46,6 +46,18 @@ function slugifyCourseName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
 // ─── Components ───────────────────────────────────────────────────────────────
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
@@ -103,6 +115,7 @@ export default function StudentCourseDetailPage() {
   const params       = useParams<{ slug: string }>();
   const searchParams = useSearchParams();
   const slug         = params?.slug;
+  const isMobile     = useIsMobile();
 
   const [course,     setCourse]     = useState<CourseDetail | null>(null);
   const [attendance, setAttendance] = useState<CourseAttendanceSummary | null>(null);
@@ -228,11 +241,25 @@ export default function StudentCourseDetailPage() {
           background: "radial-gradient(circle, rgba(15,164,175,0.08) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
-          <div style={{ flex: 1, minWidth: 280 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+
+        <div style={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "center" : "flex-start",
+          justifyContent: "space-between",
+          textAlign: isMobile ? "center" : "left",
+          gap: 20,
+        }}>
+          {/* Left / top: icon + title + meta */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: "center",
+              gap: 16, marginBottom: 16,
+            }}>
               <div style={{
-                height: 52, width: 52, borderRadius: 15,
+                height: 52, width: 52, borderRadius: 15, flexShrink: 0,
                 background: ICON_GRAD, color: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 boxShadow: "0 8px 24px rgba(15,164,175,0.3)",
@@ -243,10 +270,12 @@ export default function StudentCourseDetailPage() {
                 <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
                   {course.name}
                 </h1>
-                {course.program_name && <p style={{ fontSize: 13, color: C.body, marginTop: 4 }}>{course.program_name}</p>}
+                {course.program_name && (
+                  <p style={{ fontSize: 13, color: C.body, marginTop: 4 }}>{course.program_name}</p>
+                )}
               </div>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start", gap: 16 }}>
               {course.teacher_name && (
                 <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: C.body }}>
                   <User size={14} color={C.accent} /> {course.teacher_name}
@@ -259,7 +288,14 @@ export default function StudentCourseDetailPage() {
               )}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+
+          {/* Right / bottom: badge + active pill */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: isMobile ? "center" : "flex-end",
+            gap: 10,
+          }}>
             {course.code && (
               <span style={{
                 fontFamily: "monospace", fontSize: 12, fontWeight: 700,
@@ -325,8 +361,8 @@ export default function StudentCourseDetailPage() {
               <CardHead title="Course Details" sub="Academic information" Icon={BookOpen} />
               <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
                 {course.academic_year && course.semester_name && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <Calendar size={16} color={C.accent} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <Calendar size={16} color={C.accent} style={{ flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Academic Period</p>
                       <p style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginTop: 2 }}>
@@ -336,8 +372,8 @@ export default function StudentCourseDetailPage() {
                   </div>
                 )}
                 {course.program_name && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <GraduationCap size={16} color={C.accent} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <GraduationCap size={16} color={C.accent} style={{ flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Program</p>
                       <p style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginTop: 2 }}>{course.program_name}</p>
@@ -362,8 +398,8 @@ export default function StudentCourseDetailPage() {
               <CardHead title="Instructor" sub="Course teacher details" Icon={User} />
               <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
                 {course.teacher_name && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <User size={16} color={C.accent} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <User size={16} color={C.accent} style={{ flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Name</p>
                       <p style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginTop: 2 }}>{course.teacher_name}</p>
@@ -371,8 +407,8 @@ export default function StudentCourseDetailPage() {
                   </div>
                 )}
                 {course.teacher_email && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <Mail size={16} color={C.accent} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <Mail size={16} color={C.accent} style={{ flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Email</p>
                       <p style={{ fontSize: 13.5, color: C.text, fontWeight: 600, marginTop: 2 }}>{course.teacher_email}</p>
@@ -420,7 +456,7 @@ export default function StudentCourseDetailPage() {
                       background: "#f8fafc", border: `1px solid ${C.border}`,
                       textAlign: "center",
                     }}>
-                      <p style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{label}</p>
+                      <p style={{ fontSize: 11, color: C.muted, fontWeight: 600, whiteSpace: "nowrap" }}>{label}</p>
                       <p style={{ fontSize: 28, fontWeight: 800, color, letterSpacing: "-0.03em", lineHeight: 1, marginTop: 6 }}>{value}</p>
                     </div>
                   ))}

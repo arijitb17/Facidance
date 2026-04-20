@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Users, CheckCircle, GraduationCap, Eye, Edit, Trash2, Award, Loader2, X, BookOpen } from "lucide-react";
+import { Search, Users, CheckCircle, GraduationCap, Eye, Edit, Trash2, Loader2, X, BookOpen } from "lucide-react";
 import { useStudents } from "@/hooks/useAdmin";
 import { studentsApi, Student } from "@/lib/api";
 
@@ -142,7 +142,17 @@ export default function StudentsPage() {
       `}</style>
 
       {/* Header */}
-      <div>
+            <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>Students</h1>
         <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>Manage enrolled students, programs, status, and course mapping.</p>
       </div>
@@ -215,7 +225,6 @@ export default function StudentsPage() {
                 <StudentRow key={s.id} student={s}
                   onView={() => openModal("view", s)}
                   onEdit={() => openModal("edit", s)}
-                  onGraduate={() => openModal("graduate", s)}
                   onDelete={() => openModal("delete", s)}
                 />
               ))}
@@ -344,7 +353,7 @@ export default function StudentsPage() {
 
 // Replace the StudentRow component with this mobile-optimized version:
 
-function StudentRow({ student, onView, onEdit, onGraduate, onDelete }: { student: Student; onView: () => void; onEdit: () => void; onGraduate: () => void; onDelete: () => void }) {
+function StudentRow({ student, onView, onEdit, onDelete }: { student: Student; onView: () => void; onEdit: () => void; onDelete: () => void }) {
   const [hov, setHov] = useState(false);
   return (
     <div
@@ -373,18 +382,19 @@ function StudentRow({ student, onView, onEdit, onGraduate, onDelete }: { student
             {student.name}
           </p>
           <p style={{ 
-            fontSize: 12, color: C.muted, margin: "2px 0 0",
-            wordBreak: "break-all"
-          }}>
-            {student.email}
-          </p>
+  fontSize: 12, color: C.muted, margin: "2px 0 0",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+}}>
+  {student.email}
+</p>
         </div>
 
         {/* Actions — top right */}
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
           <IconBtn icon={Eye}    onClick={onView}     title="View" />
           <IconBtn icon={Edit}   onClick={onEdit}     title="Edit" />
-          {!student.graduated && <IconBtn icon={Award} onClick={onGraduate} title="Graduate" variant="warn" />}
           <IconBtn icon={Trash2} onClick={onDelete}   title="Delete" variant="danger" />
         </div>
       </div>

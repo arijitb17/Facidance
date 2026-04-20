@@ -230,15 +230,24 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading }: {
           {trendLabel && !loading && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 10 }}>
               <div style={{
-                display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 20,
-                background: trend === "up" ? "rgba(16,185,129,0.1)" : trend === "down" ? "rgba(249,115,22,0.1)" : "rgba(100,116,139,0.08)",
-              }}>
-                {trend === "up"   && <TrendingUp   size={11} color="#10b981" />}
-                {trend === "down" && <TrendingDown size={11} color="#f97316" />}
-                <span style={{ fontSize: 11, fontWeight: 700, color: trend === "up" ? "#10b981" : trend === "down" ? "#f97316" : C.muted }}>
-                  {trendLabel}
-                </span>
-              </div>
+  display: "inline-flex", alignItems: "center", gap: 4,
+  padding: "3px 8px", borderRadius: 20,
+  maxWidth: "100%",
+  background: trend === "up" ? "rgba(16,185,129,0.1)" : trend === "down" ? "rgba(249,115,22,0.1)" : "rgba(100,116,139,0.08)",
+}}>
+  {trend === "up"   && <TrendingUp   size={11} color="#10b981" style={{ flexShrink: 0 }} />}
+  {trend === "down" && <TrendingDown size={11} color="#f97316" style={{ flexShrink: 0 }} />}
+  <span style={{
+    fontSize: 11, fontWeight: 700,
+    color: trend === "up" ? "#10b981" : trend === "down" ? "#f97316" : C.muted,
+    whiteSpace: "nowrap",      // ← prevent wrap
+    overflow: "hidden",
+    textOverflow: "ellipsis",  // ← clip if too long
+  }}>
+    {trendLabel}
+  </span>
+</div>
+
             </div>
           )}
         </div>
@@ -460,7 +469,17 @@ export default function AdminDashboard() {
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
       {/* ── Header ── */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "4px 0 8px" }}>
+      <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>
             Admin Dashboard 🛡️
@@ -515,7 +534,14 @@ export default function AdminDashboard() {
       )}
 
       {/* ── Stat Cards — 3 columns, 2 rows (same style as teacher 4-col) ── */}
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(3, 1fr)" }} className="stat-grid">
+      <div
+  style={{
+    display: "grid",
+    gap: 16,
+    gridTemplateColumns: "repeat(3, 1fr)",
+  }}
+  className="stat-grid"
+>
         {statCards.map(({ title, value, Icon, trend, trendLabel }) => (
           <StatCard key={title} title={title} value={value} Icon={Icon} trend={trend} trendLabel={trendLabel} loading={sL || oL} />
         ))}

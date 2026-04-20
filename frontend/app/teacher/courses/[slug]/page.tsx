@@ -82,7 +82,16 @@ function Btn({
     </button>
   );
 }
-
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
 function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
   const [hov, setHov] = useState(false);
   return (
@@ -168,7 +177,7 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const params = useParams<{ slug: string }>();
   const slug = params?.slug;
-
+const isMobile = useIsMobile();
   const [course, setCourse] = useState<TeacherCourse | null>(null);
   const [students, setStudents] = useState<CourseStudentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -294,66 +303,71 @@ export default function CourseDetailPage() {
         </Btn>
       </div>
 
-      {/* Course header card */}
+      {/* Course header card - centered */}
+<div style={{
+  display: "flex",
+  flexDirection: isMobile ? "column" : "row",
+  alignItems: isMobile ? "center" : "flex-start",
+  justifyContent: "space-between",
+  textAlign: isMobile ? "center" : "left",
+  gap: 20,
+}}>
+  {/* Left / top: icon + title + meta */}
+  <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{
+      display: "flex",
+      flexDirection: isMobile ? "column" : "row",
+      alignItems: "center",
+      gap: 16, marginBottom: 16,
+    }}>
       <div style={{
-        background: CARD_GRAD,
-        border: `1px solid ${C.border}`,
-        borderRadius: 20, padding: "28px 32px",
-        boxShadow: SHADOW.rest,
-        position: "relative", overflow: "hidden",
+        height: 52, width: 52, borderRadius: 15, flexShrink: 0,
+        background: ICON_GRAD, color: "#fff",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 8px 24px rgba(15,164,175,0.3)",
       }}>
-        {/* Accent orb */}
-        <div style={{
-          position: "absolute", top: -60, right: -60,
-          width: 200, height: 200, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(15,164,175,0.08) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }} />
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
-          <div style={{ flex: 1, minWidth: 280 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-              <div style={{
-                height: 52, width: 52, borderRadius: 15,
-                background: ICON_GRAD, color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 8px 24px rgba(15,164,175,0.3)",
-              }}>
-                <BookOpen size={22} />
-              </div>
-              <div>
-                <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-                  {course.name}
-                </h1>
-                <p style={{ fontSize: 13, color: C.body, marginTop: 4 }}>{course.program}</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-              {[
-                { Icon: Building2, val: course.department },
-                { Icon: CalendarDays, val: course.semester },
-              ].map(({ Icon, val }) => (
-                <span key={val} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: C.body }}>
-                  <Icon size={14} color={C.accent} /> {val}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-            {course.code && (
-              <span style={{
-                fontFamily: "monospace", fontSize: 12, fontWeight: 700,
-                padding: "5px 12px", borderRadius: 8,
-                background: "rgba(15,164,175,0.08)",
-                border: "1px solid rgba(15,164,175,0.2)",
-                color: C.accent, letterSpacing: "0.06em",
-              }}>{course.code}</span>
-            )}
-            <PrimaryBtn onClick={exportToExcel}>
-              <Download size={14} /> Export Excel
-            </PrimaryBtn>
-          </div>
-        </div>
+        <BookOpen size={22} />
       </div>
+      <div>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+          {course.name}
+        </h1>
+        <p style={{ fontSize: 13, color: C.body, marginTop: 4 }}>{course.program}</p>
+      </div>
+    </div>
+    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-start", gap: 16 }}>
+      {[
+        { Icon: Building2, val: course.department },
+        { Icon: CalendarDays, val: course.semester },
+      ].map(({ Icon, val }) => (
+        <span key={val} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: C.body }}>
+          <Icon size={14} color={C.accent} /> {val}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  {/* Right / bottom: badge + button */}
+  <div style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: isMobile ? "center" : "flex-end",
+    gap: 10,
+  }}>
+    {course.code && (
+      <span style={{
+        fontFamily: "monospace", fontSize: 12, fontWeight: 700,
+        padding: "5px 12px", borderRadius: 8,
+        background: "rgba(15,164,175,0.08)",
+        border: "1px solid rgba(15,164,175,0.2)",
+        color: C.accent, letterSpacing: "0.06em",
+      }}>{course.code}</span>
+    )}
+    <PrimaryBtn onClick={exportToExcel}>
+      <Download size={14} /> Export Excel
+    </PrimaryBtn>
+  </div>
+</div>
 
       {/* Stat cards */}
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(4, 1fr)" }} className="stat-grid">

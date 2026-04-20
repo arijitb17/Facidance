@@ -182,3 +182,15 @@
 }
 .animate-slide-in-right  { animation: slide-in-right 0.3s ease-out; }
 .animate-slide-out-right { animation: slide-out-right 0.2s ease-in; }
+
+@media (max-width: 640px) {
+  .header-wrap {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center;
+  }
+
+  .header-wrap > div:last-child {
+    justify-content: center !important;
+  }
+}

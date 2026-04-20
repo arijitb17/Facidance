@@ -112,9 +112,9 @@ export default function LoginPage() {
       toast.success("Welcome back!", "Redirecting to your dashboard…");
       setTimeout(() => router.push(data.redirect_url ?? "/"), 1000);
     } catch (err) {
-  console.error(err);
-  toast.error("Connection error", "Could not reach the server. Please try again.");
-} finally {
+      console.error(err);
+      toast.error("Connection error", "Could not reach the server. Please try again.");
+    } finally {
       setLoading(false);
     }
   }
@@ -129,8 +129,7 @@ export default function LoginPage() {
     <>
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      {/* ── Root: fixed full-viewport, no overflow ── */}
-      <div style={{
+      <div className="auth-root" style={{
         width: "100vw",
         height: "100vh",
         overflow: "hidden",
@@ -153,7 +152,6 @@ export default function LoginPage() {
             flexShrink: 0,
           }}
         >
-          {/* bg.jpg */}
           <Image
             src="/bg.jpg"
             alt="Department of Information Technology, Gauhati University"
@@ -162,7 +160,6 @@ export default function LoginPage() {
             style={{ objectFit: "cover", objectPosition: "center top" }}
           />
 
-          {/* Dark overlay */}
           <div style={{
             position: "absolute", inset: 0, zIndex: 1,
             background: `linear-gradient(
@@ -178,10 +175,8 @@ export default function LoginPage() {
             background: "rgba(15,164,175,0.07)",
           }} />
 
-          {/* Top: logo + brand */}
           <div style={{ position: "relative", zIndex: 2 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              {/* WHITE logo background */}
               <div style={{
                 width: 58, height: 58, borderRadius: 16,
                 overflow: "hidden",
@@ -235,7 +230,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Middle: features */}
           <div style={{
             position: "relative", zIndex: 2,
             display: "flex", flexDirection: "column", gap: 13,
@@ -257,7 +251,6 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Bottom: stats */}
           <div style={{
             position: "relative", zIndex: 2,
             display: "flex",
@@ -290,7 +283,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── Right panel: form ── */}
-        <div style={{
+        <div className="auth-right" style={{
           flex: 1,
           height: "100vh",
           overflowY: "auto",
@@ -301,7 +294,6 @@ export default function LoginPage() {
           background: "linear-gradient(160deg, #f8fafc 0%, #f0f9fa 50%, #eaf6f8 100%)",
           position: "relative",
         }}>
-          {/* Ambient orb */}
           <div aria-hidden style={{
             position: "fixed", top: "-10%", right: "-5%",
             width: 400, height: 400, borderRadius: "50%",
@@ -309,9 +301,8 @@ export default function LoginPage() {
             pointerEvents: "none",
           }} />
 
-          <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
+          <div className="auth-card" style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
 
-            {/* Mobile-only logo */}
             <div className="mobile-logo" style={{
               display: "none", alignItems: "center", gap: 12,
               marginBottom: 32, justifyContent: "center",
@@ -330,20 +321,29 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Heading */}
-            <div style={{ marginBottom: 32 }}>
-              <h1 style={{
-                fontSize: 28, fontWeight: 800, color: C.text,
-                letterSpacing: "-0.03em", lineHeight: 1.1,
-              }}>
-                Welcome back 👋
-              </h1>
-              <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
-                Sign in to access your Facidance portal.
-              </p>
-            </div>
+<div
+  className="auth-heading"
+  style={{
+    marginBottom: 32,
+  }}
+>
+  <h1
+    style={{
+      fontSize: 28,
+      fontWeight: 800,
+      color: C.text,
+      letterSpacing: "-0.03em",
+      lineHeight: 1.1,
+    }}
+  >
+    Welcome back 👋
+  </h1>
 
-            {/* Form */}
+  <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
+    Sign in to access your Facidance portal.
+  </p>
+</div>
+
             <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <InputField
                 label="Email address"
@@ -419,7 +419,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Divider */}
             <div style={{
               display: "flex", alignItems: "center",
               gap: 14, margin: "28px 0",
@@ -429,7 +428,6 @@ export default function LoginPage() {
               <div style={{ flex: 1, height: 1, background: C.border }} />
             </div>
 
-            {/* Register CTA */}
             <div style={{
               padding: "18px 20px", borderRadius: 14,
               background: "rgba(15,164,175,0.05)",
@@ -472,10 +470,35 @@ export default function LoginPage() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+
         @media (max-width: 768px) {
           .login-left  { display: none !important; }
           .mobile-logo { display: flex !important; }
+
+          .auth-root {
+            height: auto !important;
+            min-height: 100vh !important;
+            overflow: visible !important;
+          }
+
+          .auth-right {
+            height: auto !important;
+            min-height: 100vh !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            padding: 40px 24px 56px !important;
+            overflow-y: visible !important;
+            box-sizing: border-box !important;
+          }
+
+          .auth-card {
+            max-width: 100% !important;
+            width: 100% !important;
+          }
         }
+          @media (max-width: 640px) {
+  .auth-heading { text-align: center; }
+}
       `}</style>
     </>
   );

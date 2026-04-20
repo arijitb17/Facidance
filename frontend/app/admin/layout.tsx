@@ -90,11 +90,15 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "linear-gradient(160deg, #f8fafc 0%, #f1f5f9 40%, #eaeff5 100%)",
-      position: "relative",
-    }}>
+<div style={{
+  minHeight: "100vh",
+  width: "100vw",          // ← force full viewport width
+  maxWidth: "100%",        // ← prevent overflow scrollbar
+  background: "linear-gradient(160deg, #f8fafc 0%, #f1f5f9 40%, #eaeff5 100%)",
+  display: "flex",
+  flexDirection: "column",
+  boxSizing: "border-box",
+}}>
       {/* Decorative ambient orbs */}
       <div aria-hidden style={{
         position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0,
@@ -111,19 +115,17 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         }} />
       </div>
 
-      <Navbar role="admin" name={adminName} />
+  <Navbar role="admin" name={adminName} />  {/* ← outside main, no padding applied */}
 
-      <main style={{
-        position: "relative",
-        zIndex: 1,
-        width: "100%",
-        maxWidth: 1600,
-        margin: "0 auto",
-        padding: "clamp(20px, 3vw, 36px) clamp(16px, 4vw, 40px)",
-      }}>
-        {children}
-      </main>
-    </div>
+  <main style={{
+    flex: 1,
+    position: "relative",
+    zIndex: 1,
+    padding: "clamp(16px, 3vw, 36px) clamp(10px, 4vw, 40px)",
+  }}>
+    {children}
+  </main>
+</div>
   );
 }
 

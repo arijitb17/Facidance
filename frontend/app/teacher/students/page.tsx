@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useRef, useMemo } from "react";
+import { useCallback, useState, useRef, useMemo,useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
@@ -233,7 +233,9 @@ export default function TeacherStudents() {
     setLoading(false);
   }
 }, [router]);
-
+useEffect(() => {
+  fetchData();
+}, [fetchData]);
 const filteredStudents = useMemo(() => {
   return students
     .filter((s) => {
@@ -364,7 +366,17 @@ parsedDob = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
         {/* Header */}
-        <div style={{ padding: "4px 0 8px" }}>
+                    <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
             Student Management
           </h1>

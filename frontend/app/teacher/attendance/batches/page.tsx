@@ -351,7 +351,17 @@ export default function AttendanceCapturePage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
         {/* Header */}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 16, padding: "4px 0 8px" }}>
+                          <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
           <div>
             <button
               onClick={goBack}
@@ -496,57 +506,57 @@ export default function AttendanceCapturePage() {
               <CardHead title="Live Camera Feed" sub="Face recognition capture" />
               <div style={{ padding: "16px 26px 26px" }}>
                 <div style={{
-                  position: "relative", borderRadius: 14, overflow: "hidden",
-                  background: "#000", aspectRatio: "16/9",
-                  boxShadow: cameraActive ? "0 0 0 3px rgba(15,164,175,0.3)" : "none",
-                  transition: EASE_ALL,
-                }}>
-                  <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <canvas ref={canvasRef} style={{ display: "none" }} />
+  position: "relative", borderRadius: 14, overflow: "hidden",
+  background: "#0a0a0a", aspectRatio: "16/9",
+  boxShadow: cameraActive ? "0 0 0 3px rgba(15,164,175,0.3)" : "none",
+  transition: EASE_ALL,
+}}>
+  <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+  <canvas ref={canvasRef} style={{ display: "none" }} />
 
-                  {/* Pre-session overlay */}
-                  {!cameraActive && !sessionActive && (
-                    <div style={{
-                      position: "absolute", inset: 0,
-                      background: "rgba(0,49,53,0.88)",
-                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                      gap: 16, padding: 24,
-                    }}>
-                      <div style={{
-                        height: 56, width: 56, borderRadius: 16, background: ICON_GRAD,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        boxShadow: "0 8px 24px rgba(15,164,175,0.4)",
-                      }}>
-                        <Camera size={24} color="#fff" />
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
-                          Ready to capture attendance
-                        </p>
-                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 6, lineHeight: 1.6, maxWidth: 280 }}>
-                          45-minute session · auto-capture every 2 min · cumulative recognition
-                        </p>
-                      </div>
-                      <button
-                        onClick={startSession}
-                        disabled={trainedCount === 0}
-                        style={{
-                          display: "inline-flex", alignItems: "center", gap: 8,
-                          padding: "12px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                          background: trainedCount === 0 ? "rgba(255,255,255,0.1)" : ICON_GRAD,
-                          color: "#fff", border: "none", cursor: trainedCount === 0 ? "not-allowed" : "pointer",
-                          boxShadow: trainedCount > 0 ? "0 8px 24px rgba(15,164,175,0.4)" : "none",
-                          opacity: trainedCount === 0 ? 0.5 : 1,
-                        }}
-                      >
-                        <Play size={17} /> Start 45-Min Session
-                      </button>
-                      {trainedCount === 0 && (
-                        <p style={{ fontSize: 11.5, color: "rgba(255,100,100,0.9)" }}>⚠️ No trained students. Train the model first.</p>
-                      )}
-                    </div>
-                  )}
-
+  {/* Pre-session overlay */}
+  {!cameraActive && !sessionActive && (
+    <div style={{
+      position: "absolute", inset: 0,
+      background: "rgba(0,0,0,0.82)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      gap: 16, padding: 24,
+    }}>
+      <div style={{
+        height: 56, width: 56, borderRadius: 16,
+        background: "rgba(255,255,255,0.1)",
+        border: "1px solid rgba(255,255,255,0.15)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Camera size={24} color="#fff" />
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
+          Ready to capture attendance
+        </p>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 6, lineHeight: 1.6, maxWidth: 280 }}>
+          45-minute session · auto-capture every 2 min · cumulative recognition
+        </p>
+      </div>
+      <button
+        onClick={startSession}
+        disabled={trainedCount === 0}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "12px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+          background: trainedCount === 0 ? "rgba(255,255,255,0.1)" : ICON_GRAD,
+          color: "#fff", border: "none", cursor: trainedCount === 0 ? "not-allowed" : "pointer",
+          boxShadow: trainedCount > 0 ? "0 8px 24px rgba(15,164,175,0.4)" : "none",
+          opacity: trainedCount === 0 ? 0.5 : 1,
+        }}
+      >
+        <Play size={17} /> Start 45-Min Session
+      </button>
+      {trainedCount === 0 && (
+        <p style={{ fontSize: 11.5, color: "rgba(255,100,100,0.9)" }}>⚠️ No trained students. Train the model first.</p>
+      )}
+    </div>
+  )}
                   {/* Live indicator */}
                   {sessionActive && !capturing && (
                     <div style={{

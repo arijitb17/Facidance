@@ -132,8 +132,7 @@ export default function RegisterTeacherPage() {
     <>
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      {/* ── Root: fixed full-viewport, no overflow ── */}
-      <div style={{
+      <div className="auth-root" style={{
         width: "100vw",
         height: "100vh",
         overflow: "hidden",
@@ -141,7 +140,7 @@ export default function RegisterTeacherPage() {
         fontFamily: "'Geist', 'Inter', system-ui, sans-serif",
       }}>
 
-        {/* ── Left panel — identical to login ── */}
+        {/* ── Left panel ── */}
         <div
           className="reg-left"
           style={{
@@ -156,7 +155,6 @@ export default function RegisterTeacherPage() {
             flexShrink: 0,
           }}
         >
-          {/* bg.jpg — same as login */}
           <Image
             src="/bg.jpg"
             alt="Department of Information Technology, Gauhati University"
@@ -165,7 +163,6 @@ export default function RegisterTeacherPage() {
             style={{ objectFit: "cover", objectPosition: "center top" }}
           />
 
-          {/* Dark overlay */}
           <div style={{
             position: "absolute", inset: 0, zIndex: 1,
             background: `linear-gradient(
@@ -181,10 +178,8 @@ export default function RegisterTeacherPage() {
             background: "rgba(15,164,175,0.07)",
           }} />
 
-          {/* Top: logo + brand */}
           <div style={{ position: "relative", zIndex: 2 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              {/* WHITE logo background */}
               <div style={{
                 width: 58, height: 58, borderRadius: 16,
                 overflow: "hidden",
@@ -238,7 +233,6 @@ export default function RegisterTeacherPage() {
             </p>
           </div>
 
-          {/* Middle: features */}
           <div style={{
             position: "relative", zIndex: 2,
             display: "flex", flexDirection: "column", gap: 13,
@@ -260,7 +254,6 @@ export default function RegisterTeacherPage() {
             ))}
           </div>
 
-          {/* Bottom: stats */}
           <div style={{
             position: "relative", zIndex: 2,
             display: "flex",
@@ -293,10 +286,10 @@ export default function RegisterTeacherPage() {
         </div>
 
         {/* ── Right panel: form ── */}
-        <div style={{
+        <div className="auth-right" style={{
           flex: 1,
           height: "100vh",
-          overflowY: "auto",         /* only scrolls if viewport too short */
+          overflowY: "auto",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -304,7 +297,6 @@ export default function RegisterTeacherPage() {
           background: "linear-gradient(160deg, #f8fafc 0%, #f0f9fa 50%, #eaf6f8 100%)",
           position: "relative",
         }}>
-          {/* Ambient orb */}
           <div aria-hidden style={{
             position: "fixed", top: "-10%", right: "-5%",
             width: 400, height: 400, borderRadius: "50%",
@@ -312,9 +304,8 @@ export default function RegisterTeacherPage() {
             pointerEvents: "none",
           }} />
 
-          <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
+          <div className="auth-card" style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>
 
-            {/* Mobile-only logo */}
             <div className="mobile-logo" style={{
               display: "none", alignItems: "center", gap: 12,
               marginBottom: 32, justifyContent: "center",
@@ -334,7 +325,6 @@ export default function RegisterTeacherPage() {
             </div>
 
             {success ? (
-              /* ── Success state ── */
               <div style={{ textAlign: "center", padding: "20px 0" }}>
                 <div style={{
                   width: 68, height: 68, borderRadius: "50%",
@@ -365,17 +355,23 @@ export default function RegisterTeacherPage() {
               </div>
             ) : (
               <>
-                <div style={{ marginBottom: 32 }}>
-                  <h1 style={{
-                    fontSize: 28, fontWeight: 800, color: C.text,
-                    letterSpacing: "-0.03em", lineHeight: 1.1,
-                  }}>
-                    Faculty registration 👋
-                  </h1>
-                  <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
-                    Create your faculty account — admin will approve it shortly.
-                  </p>
-                </div>
+                <div style={{ marginBottom: 32, textAlign: "center" }}>
+  <h1
+    style={{
+      fontSize: 28,
+      fontWeight: 800,
+      color: C.text,
+      letterSpacing: "-0.03em",
+      lineHeight: 1.1,
+    }}
+  >
+    Faculty registration 👋
+  </h1>
+
+  <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
+    Create your faculty account — admin will approve it shortly.
+  </p>
+</div>
 
                 <form onSubmit={handleRegister} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                   <InputField
@@ -494,9 +490,31 @@ export default function RegisterTeacherPage() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+
         @media (max-width: 768px) {
           .reg-left    { display: none !important; }
           .mobile-logo { display: flex !important; }
+
+          .auth-root {
+            height: auto !important;
+            min-height: 100vh !important;
+            overflow: visible !important;
+          }
+
+          .auth-right {
+            height: auto !important;
+            min-height: 100vh !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            padding: 40px 24px 56px !important;
+            overflow-y: visible !important;
+            box-sizing: border-box !important;
+          }
+
+          .auth-card {
+            max-width: 100% !important;
+            width: 100% !important;
+          }
         }
       `}</style>
     </>

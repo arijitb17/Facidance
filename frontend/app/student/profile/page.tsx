@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useStudentMe, useCheckPhotos, useUploadPhotos } from "@/hooks/useStudent";
 import Image from "next/image";
+
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const SPRING   = "cubic-bezier(.22,.68,0,1.2)";
 const EASE_ALL = `all 0.25s ${SPRING}`;
@@ -41,13 +42,13 @@ const CARD_GRAD = "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)";
 
 type PoseKey = "front" | "left" | "right";
 
-interface Photos  { front: File | null; left: File | null; right: File | null }
+interface Photos   { front: File | null; left: File | null; right: File | null }
 interface Previews { front: string | null; left: string | null; right: string | null }
 
-const POSES: Array<{ key: PoseKey; label: string; instruction: string; emoji: string }> = [
-  { key: "front", label: "Front View",    instruction: "Look straight at the camera",           emoji: "😊" },
-  { key: "left",  label: "Left Profile",  instruction: "Turn your head slightly to the left",   emoji: "😄" },
-  { key: "right", label: "Right Profile", instruction: "Turn your head slightly to the right",  emoji: "😃" },
+const POSES: Array<{ key: PoseKey; label: string; instruction: string }> = [
+  { key: "front", label: "Front View",    instruction: "Look straight at the camera"          },
+  { key: "left",  label: "Left Profile",  instruction: "Turn your head slightly to the left"  },
+  { key: "right", label: "Right Profile", instruction: "Turn your head slightly to the right" },
 ];
 
 // ─── Components ───────────────────────────────────────────────────────────────
@@ -67,14 +68,22 @@ function InfoRow({ Icon, label, value }: { Icon: React.ElementType; label: strin
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
       <div style={{
-        height: 40, width: 40, borderRadius: 11, background: "rgba(175,221,229,0.3)",
-        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        height: 40, width: 40, minWidth: 40, borderRadius: 11,
+        background: "rgba(175,221,229,0.3)",
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         <Icon size={16} color={C.accent} />
       </div>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</p>
-        <p style={{ fontSize: 14, fontWeight: 600, color: C.text, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</p>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p style={{
+          fontSize: 10.5, fontWeight: 700, color: C.muted,
+          textTransform: "uppercase", letterSpacing: "0.08em", margin: 0,
+        }}>{label}</p>
+        <p style={{
+          fontSize: 14, fontWeight: 600, color: C.text,
+          marginTop: 2, overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{value}</p>
       </div>
     </div>
   );
@@ -91,7 +100,7 @@ function PrimaryBtn({ children, onClick, disabled }: {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        display: "inline-flex", alignItems: "center", gap: 7,
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
         padding: "11px 22px", borderRadius: 12, fontSize: 13.5, fontWeight: 600,
         cursor: disabled ? "not-allowed" : "pointer", border: "none",
         background: disabled ? "#e2e8f0" : ICON_GRAD,
@@ -99,6 +108,7 @@ function PrimaryBtn({ children, onClick, disabled }: {
         boxShadow: !disabled && hov ? SHADOW.active : !disabled ? "0 8px 24px rgba(15,164,175,0.3)" : "none",
         transform: !disabled && hov ? "translateY(-2px) scale(1.01)" : "translateY(0) scale(1)",
         transition: EASE_ALL, opacity: disabled ? 0.7 : 1,
+        width: "100%",
       }}
     >
       {children}
@@ -226,43 +236,59 @@ export default function StudentProfilePage() {
     <>
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
-        {/* Header */}
-        <div style={{ padding: "4px 0 8px" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-            My Profile
-          </h1>
-          <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
-            Your personal details and face recognition setup.
-          </p>
-        </div>
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+       <div style={{ padding: "4px 0 8px" }} className="profile-header">
+  <h1 style={{
+    fontSize: "clamp(22px, 6vw, 28px)",
+    fontWeight: 800, color: C.text,
+    letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0,
+  }}>
+    My Profile
+  </h1>
+  <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
+    Your personal details and face recognition setup.
+  </p>
+</div>
 
-        {/* Profile card */}
+        {/* ── Profile card ───────────────────────────────────────────────── */}
         <Card>
-          <div style={{ padding: "28px 32px" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+          <div style={{ padding: "24px 20px" }}>
 
-              {/* Avatar + name */}
-              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            {/* Avatar + name + face badge — stacked on mobile */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+              {/* Top row: avatar + name */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
                 <div style={{
-                  height: 72, width: 72, borderRadius: 20,
+                  height: 64, width: 64, minWidth: 64, borderRadius: 18,
                   background: ICON_GRAD,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   boxShadow: "0 12px 32px rgba(15,164,175,0.35)",
-                  flexShrink: 0,
                 }}>
-                  <span style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: "#fff" }}>
                     {profile.name?.charAt(0).toUpperCase() ?? "S"}
                   </span>
                 </div>
-                <div>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h2 style={{
+                    fontSize: "clamp(17px, 4.5vw, 22px)",
+                    fontWeight: 800, color: C.text,
+                    letterSpacing: "-0.02em", lineHeight: 1.2, margin: 0,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
                     {profile.name}
                   </h2>
-                  <p style={{ fontSize: 13, color: C.body, marginTop: 4 }}>{profile.email}</p>
-                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <p style={{
+                    fontSize: 13, color: C.body, marginTop: 3,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{profile.email}</p>
+
+                  {/* Badges */}
+                  <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                     <span style={{
                       display: "inline-flex", alignItems: "center", gap: 5,
-                      padding: "4px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 700,
+                      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
                       background: "rgba(15,164,175,0.1)", color: C.accent,
                       border: `1px solid ${C.borderHov}`,
                     }}>
@@ -270,39 +296,38 @@ export default function StudentProfilePage() {
                     </span>
                     <span style={{
                       display: "inline-flex", alignItems: "center", gap: 5,
-                      padding: "4px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 700,
-                      background: new Date(profile.created_at) ? "rgba(248,250,252,0.9)" : "transparent",
+                      padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                      background: "rgba(248,250,252,0.9)",
                       color: C.body, border: `1px solid ${C.border}`,
                     }}>
-                      <Calendar size={11} />
+                      <Calendar size={10} />
                       Joined {new Date(profile.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short" })}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Face status badge */}
-              <div style={{
-                display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10,
+              {/* Face status badge — full width on mobile */}
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "9px 16px", borderRadius: 12, fontSize: 12.5, fontWeight: 700,
+                width: "100%", boxSizing: "border-box",
+                background: hasFace ? "rgba(16,185,129,0.08)" : "rgba(245,158,11,0.08)",
+                color: hasFace ? "#059669" : "#d97706",
+                border: `1px solid ${hasFace ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
               }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "8px 16px", borderRadius: 12, fontSize: 12.5, fontWeight: 700,
-                  background: hasFace ? "rgba(16,185,129,0.08)" : "rgba(245,158,11,0.08)",
-                  color: hasFace ? "#059669" : "#d97706",
-                  border: `1px solid ${hasFace ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
-                }}>
-                  {hasFace ? <UserCheck size={14} /> : <AlertCircle size={14} />}
-                  {hasFace ? "Face recognition active" : "Face recognition not set up"}
-                </span>
-              </div>
+                {hasFace ? <UserCheck size={14} /> : <AlertCircle size={14} />}
+                {hasFace ? "Face recognition active" : "Face recognition not set up"}
+              </span>
             </div>
 
-            {/* Info grid */}
+            {/* Info grid — single column on mobile */}
             <div style={{
-              display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginTop: 28,
-              paddingTop: 24, borderTop: `1px solid ${C.border}`,
-            }} className="info-grid">
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 14, marginTop: 24,
+              paddingTop: 20, borderTop: `1px solid ${C.border}`,
+            }}>
               <InfoRow Icon={User}     label="Full Name"  value={profile.name} />
               <InfoRow Icon={Mail}     label="Email"      value={profile.email} />
               {profile.student?.program_name    && <InfoRow Icon={Book}     label="Program"    value={profile.student.program_name} />}
@@ -311,27 +336,31 @@ export default function StudentProfilePage() {
           </div>
         </Card>
 
-        {/* Face recognition setup */}
+        {/* ── Face recognition setup ─────────────────────────────────────── */}
         <Card>
-          <div style={{ padding: "22px 28px 0", display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+          {/* Section header */}
+          <div style={{
+            padding: "20px 20px 0",
+            display: "flex", alignItems: "center", gap: 14, marginBottom: 20,
+          }}>
             <div style={{
-              height: 48, width: 48, borderRadius: 14, background: ICON_GRAD,
+              height: 46, width: 46, minWidth: 46, borderRadius: 14, background: ICON_GRAD,
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "0 6px 18px rgba(15,164,175,0.28)",
             }}>
               <Camera size={20} color="#fff" />
             </div>
-            <div>
-              <p style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em", margin: 0 }}>
                 Face Recognition Setup
               </p>
-              <p style={{ fontSize: 12, color: C.body, marginTop: 2 }}>
+              <p style={{ fontSize: 12, color: C.body, marginTop: 2, margin: 0 }}>
                 Upload photos for automatic AI attendance marking
               </p>
             </div>
           </div>
 
-          <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ padding: "0 20px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
 
             {/* Camera view */}
             {activeCamera && (
@@ -342,7 +371,11 @@ export default function StudentProfilePage() {
                   background: "#000",
                   boxShadow: "0 0 0 3px rgba(15,164,175,0.3)",
                 }}>
-                  <video ref={videoRef} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted playsInline />
+                  <video
+                    ref={videoRef}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    autoPlay muted playsInline
+                  />
                   <div style={{
                     position: "absolute", top: 12, left: 12,
                     display: "flex", alignItems: "center", gap: 6,
@@ -353,14 +386,27 @@ export default function StudentProfilePage() {
                     Camera Live
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <PrimaryBtn onClick={capturePhoto}>
+
+                {/* Camera action buttons */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button
+                    onClick={capturePhoto}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                      padding: "12px 22px", borderRadius: 12, fontSize: 14, fontWeight: 600,
+                      cursor: "pointer", border: "none",
+                      background: ICON_GRAD, color: "#fff",
+                      boxShadow: "0 8px 24px rgba(15,164,175,0.3)",
+                      width: "100%",
+                    }}
+                  >
                     <Camera size={15} /> Capture Photo
-                  </PrimaryBtn>
+                  </button>
                   <button
                     onClick={stopCamera}
                     style={{
-                      flex: 1, padding: "11px 22px", borderRadius: 12, fontSize: 13.5, fontWeight: 600,
+                      width: "100%", padding: "12px 22px", borderRadius: 12,
+                      fontSize: 14, fontWeight: 600,
                       cursor: "pointer", background: C.white,
                       color: C.textSoft, border: `1px solid ${C.border}`,
                       boxShadow: SHADOW.rest,
@@ -372,8 +418,8 @@ export default function StudentProfilePage() {
               </div>
             )}
 
-            {/* Pose cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }} className="pose-grid">
+            {/* Pose cards — single column on mobile, 3 col on larger */}
+            <div className="pose-grid" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {POSES.map(({ key, label, instruction }) => (
                 <div key={key} style={{
                   borderRadius: 16, border: `1px solid ${previews[key] ? C.borderHov : C.border}`,
@@ -381,53 +427,63 @@ export default function StudentProfilePage() {
                   background: previews[key] ? "rgba(15,164,175,0.04)" : "#f8fafc",
                   boxShadow: previews[key] ? `0 0 0 3px rgba(15,164,175,0.1), ${SHADOW.rest}` : SHADOW.rest,
                   transition: EASE_ALL,
-                  display: "flex", flexDirection: "column", gap: 12,
                 }}>
-                  <div>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{label}</p>
-                    <p style={{ fontSize: 11.5, color: C.body, marginTop: 3 }}>{instruction}</p>
+                  {/* Pose label */}
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 13.5, fontWeight: 700, color: C.text, margin: 0 }}>{label}</p>
+                    <p style={{ fontSize: 12, color: C.body, marginTop: 3, margin: 0 }}>{instruction}</p>
                   </div>
 
                   {previews[key] ? (
-                    <div style={{ position: "relative" }}>
-                      <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 10, overflow: "hidden", background: "#f1f5f9" }}>
-                        <Image
-  src={previews[key]!}
-  alt={label}
-  fill
-  style={{ objectFit: "cover" }}
-/>
-                      </div>
-                      <button
-                        onClick={() => removePhoto(key)}
-                        style={{
-                          position: "absolute", top: 8, right: 8,
-                          width: 24, height: 24, borderRadius: "50%",
-                          background: "rgba(0,0,0,0.7)", color: "#fff",
-                          border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        ×
-                      </button>
+                    /* Preview layout: image left, status right */
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                       <div style={{
-                        marginTop: 8, display: "inline-flex", alignItems: "center", gap: 5,
-                        padding: "4px 10px", borderRadius: 20,
-                        background: "rgba(16,185,129,0.08)", color: "#059669",
-                        border: "1px solid rgba(16,185,129,0.2)",
-                        fontSize: 11.5, fontWeight: 700,
+                        position: "relative",
+                        width: 80, minWidth: 80, height: 106,
+                        borderRadius: 10, overflow: "hidden",
+                        background: "#f1f5f9",
                       }}>
-                        <CheckCircle2 size={12} /> Photo ready
+                        <Image
+                          src={previews[key]!}
+                          alt={label}
+                          fill
+                          style={{ objectFit: "cover" }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          padding: "5px 10px", borderRadius: 20,
+                          background: "rgba(16,185,129,0.08)", color: "#059669",
+                          border: "1px solid rgba(16,185,129,0.2)",
+                          fontSize: 12, fontWeight: 700,
+                        }}>
+                          <CheckCircle2 size={12} /> Photo ready
+                        </div>
+                        <button
+                          onClick={() => removePhoto(key)}
+                          style={{
+                            padding: "7px 14px", borderRadius: 8,
+                            background: "rgba(220,38,38,0.07)", color: "#dc2626",
+                            border: "1px solid rgba(220,38,38,0.15)",
+                            cursor: "pointer", fontSize: 12, fontWeight: 600,
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                          }}
+                        >
+                          Remove
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    /* Upload / camera buttons — side by side on mobile */
+                    <div style={{ display: "flex", gap: 8 }}>
                       <button
                         onClick={() => startCamera(key)}
                         disabled={activeCamera !== null}
                         style={{
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                          padding: "9px 14px", borderRadius: 10, fontSize: 12.5, fontWeight: 600,
+                          flex: 1,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                          padding: "10px 8px", borderRadius: 10, fontSize: 12.5, fontWeight: 600,
                           cursor: activeCamera ? "not-allowed" : "pointer",
                           background: activeCamera ? "#e2e8f0" : "rgba(15,164,175,0.1)",
                           color: activeCamera ? C.muted : C.primary,
@@ -435,17 +491,18 @@ export default function StudentProfilePage() {
                           transition: EASE_ALL,
                         }}
                       >
-                        <Camera size={14} /> Use Camera
+                        <Camera size={13} /> Camera
                       </button>
                       <label style={{
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                        padding: "9px 14px", borderRadius: 10, fontSize: 12.5, fontWeight: 600,
+                        flex: 1,
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        padding: "10px 8px", borderRadius: 10, fontSize: 12.5, fontWeight: 600,
                         cursor: "pointer",
                         background: C.white, color: C.textSoft,
                         border: `1px solid ${C.border}`,
                         transition: EASE_ALL,
                       }}>
-                        <Upload size={14} /> Upload Image
+                        <Upload size={13} /> Upload
                         <input
                           type="file" accept="image/*"
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoSelect(key, f); }}
@@ -472,19 +529,32 @@ export default function StudentProfilePage() {
               }}>
                 {uploadStatus === "success" && <CheckCircle2 size={16} />}
                 {uploadStatus === "error"   && <AlertCircle size={16} />}
-                {uploadStatus === "uploading" && <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(15,164,175,0.3)", borderTopColor: C.accent, animation: "spin 0.9s linear infinite" }} />}
+                {uploadStatus === "uploading" && (
+                  <div style={{
+                    width: 14, height: 14, flexShrink: 0, borderRadius: "50%",
+                    border: "2px solid rgba(15,164,175,0.3)", borderTopColor: C.accent,
+                    animation: "spin 0.9s linear infinite",
+                  }} />
+                )}
                 <span>{message}</span>
               </div>
             )}
 
-            {/* Submit button */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-              <p style={{ fontSize: 12, color: C.body }}>
+            {/* Submit section */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ fontSize: 12, color: C.body, margin: 0, textAlign: "center" }}>
                 Photos are stored securely and used only for AI attendance verification.
               </p>
               <PrimaryBtn onClick={handleSubmit} disabled={uploadStatus === "uploading" || !hasAnyPhoto}>
                 {uploadStatus === "uploading" ? (
-                  <><div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.9s linear infinite" }} /> Processing…</>
+                  <>
+                    <div style={{
+                      width: 14, height: 14, borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff",
+                      animation: "spin 0.9s linear infinite",
+                    }} />
+                    Processing…
+                  </>
                 ) : (
                   <><Upload size={15} /> Submit Photos</>
                 )}
@@ -496,13 +566,16 @@ export default function StudentProfilePage() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 900px) {
-          .info-grid  { grid-template-columns: 1fr !important; }
-          .pose-grid  { grid-template-columns: 1fr !important; }
+
+        @media (min-width: 640px) {
+          .pose-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
         }
-        @media (max-width: 600px) {
-          .pose-grid  { grid-template-columns: 1fr !important; }
-        }
+          @media (max-width: 639px) {
+  .profile-header { text-align: center; }
+}
       `}</style>
     </>
   );

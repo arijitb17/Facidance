@@ -127,7 +127,17 @@ export default function DepartmentsPage() {
       `}</style>
 
       {/* Header */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>Departments</h1>
           <p style={{ fontSize: 14, color: C.body, marginTop: 6, lineHeight: 1.5 }}>Manage academic departments and their structure.</p>

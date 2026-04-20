@@ -256,7 +256,17 @@ export default function TeacherAttendance() {
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
       {/* Header */}
-      <div style={{ padding: "4px 0 8px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                  <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "4px 0 8px",
+  }}
+  className="header-wrap"
+> 
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
             Attendance Management
@@ -382,7 +392,7 @@ export default function TeacherAttendance() {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
             <ActionBtn
               variant="warning"
               onClick={handleTrainStudents}
@@ -552,7 +562,7 @@ function AttendanceStudentRow({ student, isLast }: { student: CourseStudentItem;
           color: hasPhotos ? "#059669" : "#dc2626",
           border: `1px solid ${hasPhotos ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
         }}>
-          {hasPhotos ? "✅ Available" : "❌ Missing"}
+          {hasPhotos ? "Available" : "Missing"}
         </span>
       </td>
       <td style={{ padding: "13px 24px", fontSize: 13, color: C.body }}>{student.photoCount || 0}</td>
@@ -564,7 +574,7 @@ function AttendanceStudentRow({ student, isLast }: { student: CourseStudentItem;
           color: trained ? C.accent : "#d97706",
           border: `1px solid ${trained ? C.borderHov : "rgba(245,158,11,0.25)"}`,
         }}>
-          {trained ? "✅ Trained" : "⏳ Pending"}
+          {trained ? "Trained" : "Pending"}
         </span>
       </td>
     </tr>

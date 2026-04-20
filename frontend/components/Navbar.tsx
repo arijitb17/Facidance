@@ -169,10 +169,11 @@ function NavbarShell({ nav, homeHref, displayName, subtitle }: ShellProps) {
     <>
       {/* ── Sticky header ── */}
       <header style={{
-        position: "sticky", top: 0, zIndex: 100, height: 70,
-        display: "flex", alignItems: "center",
-        paddingLeft: "clamp(16px, 4vw, 40px)",
-        paddingRight: "clamp(16px, 4vw, 40px)",
+         position: "sticky", top: 0, zIndex: 100, height: 70,
+  width: "100%", boxSizing: "border-box",   // ← add these two
+  display: "flex", alignItems: "center",
+  paddingLeft: "clamp(16px, 4vw, 40px)",
+  paddingRight: "clamp(16px, 4vw, 40px)",
         backdropFilter: "blur(20px) saturate(200%)",
         WebkitBackdropFilter: "blur(20px) saturate(200%)",
         background: scrolled ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
@@ -374,6 +375,14 @@ function NavbarShell({ nav, homeHref, displayName, subtitle }: ShellProps) {
         @media (max-width: 960px) and (min-width: 768px) {
           .logout-label { display: none !important; }
         }
+          @media (min-width: 1024px) { .mobile-hamburger { display: none !important; } }
+@media (max-width: 1023px) {
+  .mobile-hamburger { display: flex !important; }
+  .desktop-nav      { display: none !important; }
+  .profile-text     { display: none !important; }
+  .profile-divider  { display: none !important; }
+  .logout-btn       { display: none !important; }
+}
       `}</style>
     </>
   );
