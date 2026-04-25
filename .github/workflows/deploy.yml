@@ -1,12 +1,5 @@
 # ═══════════════════════════════════════════════════════════════
 #  .github/workflows/deploy.yml
-#
-#  Trigger: push to `main` branch
-#  Pipeline:
-#    1. Lint / test (Python + Node)
-#    2. Build all Docker images
-#    3. Push to GitHub Container Registry (ghcr.io)
-#    4. SSH into VPS and pull + restart containers
 # ═══════════════════════════════════════════════════════════════
 
 name: 🚀 Build & Deploy
@@ -19,7 +12,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # e.g.  ghcr.io/yourgithubusername/facidance
   IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/facidance
 
 jobs:
@@ -34,7 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Python ────────────────────────────────────────────
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -47,7 +38,6 @@ jobs:
       - name: Lint Python (ruff)
         run: ruff check backend/
 
-      # ── Node.js ───────────────────────────────────────────
       - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
@@ -69,7 +59,6 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # JOB 2: Build & Push Docker images
-  # Runs only on push to main (not on PRs)
   # ─────────────────────────────────────────────────────────────
   build-and-push:
     name: 🐳 Build & Push Images
@@ -151,6 +140,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Open SSH for runner IP
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.AWS_SG_ID }} \
+            --protocol tcp --port 22 \
+            --cidr ${RUNNER_IP}/32
+          echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_ENV
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -176,8 +178,20 @@ jobs:
             docker image prune -f
 
             docker compose -f docker-compose.prod.yml exec nginx nginx -s reload || true
-            
+
             echo "✅ Deployment complete"
+
+      - name: Close SSH port
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.AWS_SG_ID }} \
+            --protocol tcp --port 22 \
+            --cidr ${RUNNER_IP}/32
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
 
       - name: Notify on failure
         if: failure()
