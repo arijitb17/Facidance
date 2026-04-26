@@ -9,7 +9,7 @@ Mirrors the logic in the Next.js teacher API routes.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 import secrets
