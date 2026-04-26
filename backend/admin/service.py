@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import random
 import string
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -30,6 +31,11 @@ from backend.admin.schemas import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _new_id() -> str:
+    """Generate a random UUID string to use as a primary key."""
+    return str(uuid.uuid4())
+
 
 def _get_dept_code(dept_name: Optional[str]) -> str:
     """
@@ -106,7 +112,11 @@ async def approve_teacher(data: ApproveTeacherRequest) -> dict:
         where={"userId": data.teacher_id},
         data={
             "update": {"departmentId": data.department_id},
-            "create": {"userId": data.teacher_id, "departmentId": data.department_id},
+            "create": {
+                "id": _new_id(),
+                "userId": data.teacher_id,
+                "departmentId": data.department_id,
+            },
         },
     )
     return {
@@ -125,12 +135,16 @@ async def create_teacher(data: CreateTeacherRequest) -> dict:
     try:
         user = await prisma.user.create(
             data={
+                "id": _new_id(),
                 "name": data.name,
                 "email": data.email,
                 "password": hashed,
                 "role": "TEACHER",
                 "teacher": {
-                    "create": {"departmentId": data.department_id}
+                    "create": {
+                        "id": _new_id(),
+                        "departmentId": data.department_id,
+                    }
                 },
             }
         )
@@ -175,7 +189,7 @@ async def get_departments() -> list[dict]:
 async def create_department(data: CreateDepartmentRequest) -> dict:
     """Create a single department. Mirrors POST /api/admin/departments."""
     dept = await prisma.department.create(
-        data={"name": data.name},
+        data={"id": _new_id(), "name": data.name},
         include={"_count": {"select": {"programs": True, "teachers": True}}},
     )
     return {
@@ -284,7 +298,7 @@ async def create_program(data: CreateProgramRequest) -> dict:
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
     prog = await prisma.program.create(
-        data={"name": data.name, "departmentId": data.department_id},
+        data={"id": _new_id(), "name": data.name, "departmentId": data.department_id},
         include={"department": True},
     )
     return {
@@ -366,7 +380,7 @@ async def create_course(data: CreateCourseRequest) -> dict:
     )
     if not ay:
         ay = await prisma.academicyear.create(
-            data={"name": data.academic_year, "programId": data.program_id}
+            data={"id": _new_id(), "name": data.academic_year, "programId": data.program_id}
         )
 
     # Find or create Semester
@@ -376,7 +390,7 @@ async def create_course(data: CreateCourseRequest) -> dict:
     )
     if not sem:
         sem = await prisma.semester.create(
-            data={"name": semester_name, "academicYearId": ay.id}
+            data={"id": _new_id(), "name": semester_name, "academicYearId": ay.id}
         )
 
     # Auto-generate course code: DEPT-SemIndex (e.g. IT-701)
@@ -386,6 +400,7 @@ async def create_course(data: CreateCourseRequest) -> dict:
 
     course = await prisma.course.create(
         data={
+            "id": _new_id(),
             "name": data.name,
             "code": course_code,
             "entryCode": _random_entry_code(),

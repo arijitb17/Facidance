@@ -10,6 +10,8 @@ import {
   teacherHierarchyApi, teacherCoursesApi,
   type TeacherHierarchy, type CourseStudentItem,
 } from "@/lib/teacher-api";
+import { useToast } from "@/lib/useToast";
+import { ToastContainer } from "@/components/ToastContainer";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const SPRING   = "cubic-bezier(.22,.68,0,1.2)";
@@ -148,6 +150,8 @@ function ActionBtn({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function TeacherAttendance() {
   const router = useRouter();
+  const { toasts, toast, removeToast } = useToast();
+
   const [currentView, setCurrentView] = useState<"select" | "students">("select");
   const [hierarchy, setHierarchy] = useState<TeacherHierarchy | null>(null);
   const [loadingHierarchy, setLoadingHierarchy] = useState(true);
@@ -185,7 +189,11 @@ export default function TeacherAttendance() {
   }, [allCourses, searchQuery]);
 
   useEffect(() => {
-    teacherHierarchyApi.get().then(setHierarchy).catch(() => alert("Failed to load courses")).finally(() => setLoadingHierarchy(false));
+    teacherHierarchyApi.get()
+      .then(setHierarchy)
+      .catch(() => toast.error("Failed to load courses", "Please refresh the page"))
+      .finally(() => setLoadingHierarchy(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchCourseStudents(courseId: string) {
@@ -195,7 +203,7 @@ export default function TeacherAttendance() {
       setStudents(data.students || []);
       setCurrentView("students");
     } catch (e) {
-      alert("Error fetching students: " + (e instanceof Error ? e.message : "Unknown"));
+      toast.error("Failed to load students", e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -210,15 +218,23 @@ export default function TeacherAttendance() {
 
   async function handleTrainStudents() {
     if (!selectedCourse) return;
-    if (students.filter((s) => !s.faceEmbedding).length === 0) { alert("ℹ️ All students are already trained!"); return; }
+
+    const untrainedCount = students.filter((s) => !s.faceEmbedding).length;
+    if (untrainedCount === 0) {
+      toast.info("Already trained", "All students already have face embeddings.");
+      return;
+    }
+
     setTraining(true);
+    toast.info("Training started", `Processing ${untrainedCount} student(s) — this may take a few minutes…`);
+
     try {
       const { teacherAttendanceApi } = await import("@/lib/teacher-api");
       const data = await teacherAttendanceApi.runTraining(selectedCourse.id);
-      alert("✅ " + data.message);
+      toast.success("Training complete", data.message);
       fetchCourseStudents(selectedCourse.id);
     } catch (e) {
-      alert("❌ " + (e instanceof Error ? e.message : "Training failed"));
+      toast.error("Training failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
       setTraining(false);
     }
@@ -226,15 +242,18 @@ export default function TeacherAttendance() {
 
   function handleCaptureAttendance() {
     if (!selectedCourse) return;
-    if (students.filter((s) => s.faceEmbedding).length === 0) { alert("⚠️ No trained students yet. Please train the model first."); return; }
+    if (students.filter((s) => s.faceEmbedding).length === 0) {
+      toast.warning("No trained students", "Please train the recognition model first.");
+      return;
+    }
     localStorage.setItem("selectedCourseId", selectedCourse.id);
     localStorage.setItem("selectedCourseName", selectedCourse.name);
     router.push(`/teacher/attendance/batches?courseId=${selectedCourse.id}&courseName=${encodeURIComponent(selectedCourse.name)}`);
   }
 
-  const trainedCount = students.filter((s) => s.faceEmbedding).length;
+  const trainedCount    = students.filter((s) => s.faceEmbedding).length;
   const withPhotosCount = students.filter((s) => s.hasPhotos).length;
-  const untrainedCount = students.length - trainedCount;
+  const untrainedCount  = students.length - trainedCount;
 
   if (loadingHierarchy) {
     return (
@@ -253,260 +272,281 @@ export default function TeacherAttendance() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {/* Header */}
-                  <div
-  style={{
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-    padding: "4px 0 8px",
-  }}
-  className="header-wrap"
-> 
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-            Attendance Management
-          </h1>
-          <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
-            Select a course, train the face recognition model, then capture live attendance.
-          </p>
+        {/* Header */}
+        <div
+          style={{
+            display: "flex", flexWrap: "wrap", alignItems: "center",
+            justifyContent: "space-between", gap: 16, padding: "4px 0 8px",
+          }}
+          className="header-wrap"
+        >
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              Attendance Management
+            </h1>
+            <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
+              Select a course, train the face recognition model, then capture live attendance.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Course select */}
-      {currentView === "select" && (
-        <Card>
-          <div style={{ padding: "22px 28px 0", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{
-                height: 44, width: 44, borderRadius: 13, background: ICON_GRAD,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 6px 18px rgba(15,164,175,0.28)",
-              }}>
-                <BookOpen size={19} color="#fff" />
-              </div>
-              <div>
-                <p style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>Select Course</p>
-                <p style={{ fontSize: 12, color: C.body, marginTop: 2 }}>
-                  {allCourses.length} courses available — search to filter
-                </p>
+        {/* Course select */}
+        {currentView === "select" && (
+          <Card>
+            <div style={{ padding: "22px 28px 0", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  height: 44, width: 44, borderRadius: 13, background: ICON_GRAD,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 6px 18px rgba(15,164,175,0.28)",
+                }}>
+                  <BookOpen size={19} color="#fff" />
+                </div>
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>Select Course</p>
+                  <p style={{ fontSize: 12, color: C.body, marginTop: 2 }}>
+                    {allCourses.length} courses available — search to filter
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 0 }}>
-            {/* Search input */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10,
-              background: "#f8fafc",
-              border: `1px solid ${searchFocused ? C.borderHov : C.border}`,
-              borderRadius: showDropdown && filteredCourses.length > 0 ? "11px 11px 0 0" : 11,
-              padding: "10px 14px",
-              boxShadow: searchFocused ? `0 0 0 3px rgba(15,164,175,0.1)` : SHADOW.rest,
-              transition: "border-color 0.2s, box-shadow 0.2s",
-            }}>
-              <Search size={14} color={searchFocused ? C.accent : C.mutedLight} style={{ flexShrink: 0, transition: EASE_ALL }} />
-              <input
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
-                onFocus={() => { setShowDropdown(true); setSearchFocused(true); }}
-                onBlur={() => { setTimeout(() => setShowDropdown(false), 180); setSearchFocused(false); }}
-                placeholder="Search by course name, department, program, or semester…"
-                style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13.5, color: C.text }}
-              />
-              {searchQuery && (
-                <button onClick={() => { setSearchQuery(""); setShowDropdown(false); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}>
-                  <X size={13} color={C.mutedLight} />
-                </button>
+            <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 0 }}>
+              {/* Search input */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 10,
+                background: "#f8fafc",
+                border: `1px solid ${searchFocused ? C.borderHov : C.border}`,
+                borderRadius: showDropdown && filteredCourses.length > 0 ? "11px 11px 0 0" : 11,
+                padding: "10px 14px",
+                boxShadow: searchFocused ? `0 0 0 3px rgba(15,164,175,0.1)` : SHADOW.rest,
+                transition: "border-color 0.2s, box-shadow 0.2s",
+              }}>
+                <Search size={14} color={searchFocused ? C.accent : C.mutedLight} style={{ flexShrink: 0, transition: EASE_ALL }} />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
+                  onFocus={() => { setShowDropdown(true); setSearchFocused(true); }}
+                  onBlur={() => { setTimeout(() => setShowDropdown(false), 180); setSearchFocused(false); }}
+                  placeholder="Search by course name, department, program, or semester…"
+                  style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13.5, color: C.text }}
+                />
+                {searchQuery && (
+                  <button onClick={() => { setSearchQuery(""); setShowDropdown(false); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}>
+                    <X size={13} color={C.mutedLight} />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown */}
+              {showDropdown && filteredCourses.length > 0 && (
+                <div style={{
+                  border: `1px solid ${C.borderHov}`, borderTop: "none",
+                  borderRadius: "0 0 11px 11px",
+                  maxHeight: 300, overflowY: "auto",
+                  boxShadow: "0 12px 32px rgba(0,49,53,0.1)",
+                  background: C.white,
+                }}>
+                  {filteredCourses.map((course, idx) => (
+                    <CourseOption key={course.id} course={course} isLast={idx === filteredCourses.length - 1} onSelect={handleCourseSelect} />
+                  ))}
+                </div>
+              )}
+              {showDropdown && searchQuery && filteredCourses.length === 0 && (
+                <div style={{
+                  border: `1px solid ${C.border}`, borderTop: "none",
+                  borderRadius: "0 0 11px 11px", padding: "20px 16px",
+                  textAlign: "center", background: C.white,
+                }}>
+                  <p style={{ fontSize: 13, color: C.body }}>No courses found for "{searchQuery}"</p>
+                </div>
               )}
             </div>
+          </Card>
+        )}
 
-            {/* Dropdown */}
-            {showDropdown && filteredCourses.length > 0 && (
-              <div style={{
-                border: `1px solid ${C.borderHov}`, borderTop: "none",
-                borderRadius: "0 0 11px 11px",
-                maxHeight: 300, overflowY: "auto",
-                boxShadow: "0 12px 32px rgba(0,49,53,0.1)",
-                background: C.white,
-              }}>
-                {filteredCourses.map((course, idx) => (
-                  <CourseOption key={course.id} course={course} isLast={idx === filteredCourses.length - 1} onSelect={handleCourseSelect} />
-                ))}
-              </div>
-            )}
-            {showDropdown && searchQuery && filteredCourses.length === 0 && (
-              <div style={{
-                border: `1px solid ${C.border}`, borderTop: "none",
-                borderRadius: "0 0 11px 11px", padding: "20px 16px",
-                textAlign: "center", background: C.white,
-              }}>
-                <p style={{ fontSize: 13, color: C.body }}>No courses found for "{searchQuery}"</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* Students view */}
-      {currentView === "students" && selectedCourse && (
-        <>
-          {/* Selected course pill */}
-          <div style={{
-            display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between",
-            gap: 14, padding: "18px 24px",
-            background: "rgba(15,164,175,0.06)",
-            border: `1px solid ${C.borderHov}`,
-            borderRadius: 16,
-          }}>
-            <div>
-              <p style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>
-                Selected Course
-              </p>
-              <p style={{ fontSize: 17, fontWeight: 800, color: C.text, letterSpacing: "-0.02em" }}>{selectedCourse.name}</p>
-              <p style={{ fontSize: 12, color: C.body, marginTop: 3 }}>{selectedCourse.displayPath}</p>
-            </div>
-            <button
-              onClick={() => { setSelectedCourse(null); setStudents([]); setCurrentView("select"); }}
-              style={{
-                fontSize: 12, fontWeight: 600, color: C.body,
-                background: C.white, border: `1px solid ${C.border}`,
-                borderRadius: 9, padding: "7px 14px", cursor: "pointer",
-                transition: EASE_ALL,
-              }}
-            >
-              Change course
-            </button>
-          </div>
-
-          {/* Stat cards */}
-          <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(4, 1fr)" }} className="stat-grid">
-            <StatCard title="Total Students" value={students.length}   Icon={Users}        />
-            <StatCard title="Trained"         value={trainedCount}       Icon={CheckCircle2} color={trainedCount > 0 ? C.accent : C.text} />
-            <StatCard title="Have Photos"     value={withPhotosCount}    Icon={Camera}       />
-            <StatCard title="Not Trained"     value={untrainedCount}     Icon={AlertCircle}  color={untrainedCount > 0 ? "#dc2626" : C.text} />
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
-            <ActionBtn
-              variant="warning"
-              onClick={handleTrainStudents}
-              disabled={training || loading}
-            >
-              <Sparkles size={17} />
-              {training ? "Training model…" : "Train Recognition Model"}
-            </ActionBtn>
-            <ActionBtn
-              variant="primary"
-              onClick={handleCaptureAttendance}
-              disabled={loading || trainedCount === 0}
-            >
-              <PlayCircle size={17} />
-              Capture Attendance
-            </ActionBtn>
-          </div>
-
-          {/* Students table */}
-          <Card>
+        {/* Students view */}
+        {currentView === "students" && selectedCourse && (
+          <>
+            {/* Selected course pill */}
             <div style={{
-              padding: "22px 28px 16px",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              borderBottom: `1px solid ${C.border}`,
+              display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between",
+              gap: 14, padding: "18px 24px",
+              background: "rgba(15,164,175,0.06)",
+              border: `1px solid ${C.borderHov}`,
+              borderRadius: 16,
             }}>
               <div>
-                <p style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>Enrolled Students</p>
-                <p style={{ fontSize: 12, color: C.body, marginTop: 3 }}>{students.length} total enrolled</p>
+                <p style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>
+                  Selected Course
+                </p>
+                <p style={{ fontSize: 17, fontWeight: 800, color: C.text, letterSpacing: "-0.02em" }}>{selectedCourse.name}</p>
+                <p style={{ fontSize: 12, color: C.body, marginTop: 3 }}>{selectedCourse.displayPath}</p>
               </div>
+              <button
+                onClick={() => { setSelectedCourse(null); setStudents([]); setCurrentView("select"); }}
+                style={{
+                  fontSize: 12, fontWeight: 600, color: C.body,
+                  background: C.white, border: `1px solid ${C.border}`,
+                  borderRadius: 9, padding: "7px 14px", cursor: "pointer",
+                  transition: EASE_ALL,
+                }}
+              >
+                Change course
+              </button>
             </div>
 
-            {loading ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
+            {/* Stat cards */}
+            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(4, 1fr)" }} className="stat-grid">
+              <StatCard title="Total Students" value={students.length}   Icon={Users}        />
+              <StatCard title="Trained"         value={trainedCount}       Icon={CheckCircle2} color={trainedCount > 0 ? C.accent : C.text} />
+              <StatCard title="Have Photos"     value={withPhotosCount}    Icon={Camera}       />
+              <StatCard title="Not Trained"     value={untrainedCount}     Icon={AlertCircle}  color={untrainedCount > 0 ? "#dc2626" : C.text} />
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
+              <ActionBtn
+                variant="warning"
+                onClick={handleTrainStudents}
+                disabled={training || loading}
+              >
+                <Sparkles size={17} />
+                {training ? "Training model…" : "Train Recognition Model"}
+              </ActionBtn>
+              <ActionBtn
+                variant="primary"
+                onClick={handleCaptureAttendance}
+                disabled={loading || trainedCount === 0}
+              >
+                <PlayCircle size={17} />
+                Capture Attendance
+              </ActionBtn>
+            </div>
+
+            {/* Training in-progress banner */}
+            {training && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "14px 20px", borderRadius: 14,
+                background: "rgba(245,158,11,0.06)",
+                border: "1px solid rgba(245,158,11,0.25)",
+              }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: "50%",
-                  border: "2px solid rgba(15,164,175,0.15)", borderTopColor: C.accent,
+                  width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                  border: "2px solid rgba(245,158,11,0.2)", borderTopColor: "#f59e0b",
                   animation: "spin 0.9s linear infinite",
                 }} />
-              </div>
-            ) : students.length === 0 ? (
-              <div style={{ padding: "56px 0", textAlign: "center" }}>
-                <GraduationCap size={36} color={C.mutedLight} style={{ margin: "0 auto 12px" }} />
-                <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>No students enrolled</p>
-                <p style={{ fontSize: 12, color: C.body, marginTop: 5 }}>Students will appear here once enrolled in this course.</p>
-              </div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", minWidth: 500, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#f8fafc" }}>
-                      {["Student", "Photos", "Photo Count", "Status"].map((h) => (
-                        <th key={h} style={{
-                          padding: "12px 24px", textAlign: "left",
-                          fontSize: 10.5, fontWeight: 700, color: C.muted,
-                          textTransform: "uppercase", letterSpacing: "0.09em",
-                          borderBottom: `1px solid ${C.border}`,
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((student, idx) => (
-                      <AttendanceStudentRow key={student.id} student={student} isLast={idx === students.length - 1} />
-                    ))}
-                  </tbody>
-                </table>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "#92400e" }}>Training face recognition model…</p>
+                  <p style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
+                    This can take several minutes depending on the number of students. Please keep this page open.
+                  </p>
+                </div>
               </div>
             )}
-          </Card>
 
-          {/* Next steps hint */}
-          <div style={{
-            padding: "20px 24px", borderRadius: 16,
-            background: "rgba(15,164,175,0.05)",
-            border: `1px solid ${C.borderHov}`,
-          }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: C.primary, marginBottom: 10 }}>📋 Next Steps</p>
-            <ol style={{ paddingLeft: 18, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-              {trainedCount === 0 ? (
-                <>
-                  <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Make sure each student has captured photos using the photo tool.</li>
-                  <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Click <strong style={{ color: C.text }}>Train Recognition Model</strong> to generate face embeddings.</li>
-                  <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>After training, use <strong style={{ color: C.text }}>Capture Attendance</strong> to start a live session.</li>
-                </>
-              ) : (
-                <>
-                  <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Click <strong style={{ color: C.text }}>Capture Attendance</strong> to start the 45-minute AI session.</li>
-                  <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Ask students to look at the camera — face captures run automatically every 2 minutes.</li>
-                  <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Review results in the Reports section after the session ends.</li>
-                </>
-              )}
-            </ol>
-            {untrainedCount > 0 && (
+            {/* Students table */}
+            <Card>
               <div style={{
-                marginTop: 14, padding: "10px 14px", borderRadius: 10,
-                background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)",
-                display: "flex", alignItems: "center", gap: 8,
+                padding: "22px 28px 16px",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                borderBottom: `1px solid ${C.border}`,
               }}>
-                <AlertCircle size={14} color="#d97706" />
-                <span style={{ fontSize: 12.5, color: "#92400e" }}>
-                  <strong>{untrainedCount}</strong> student{untrainedCount > 1 ? "s" : ""} still {untrainedCount > 1 ? "have" : "has"} no face embeddings — train the model to include them.
-                </span>
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>Enrolled Students</p>
+                  <p style={{ fontSize: 12, color: C.body, marginTop: 3 }}>{students.length} total enrolled</p>
+                </div>
               </div>
-            )}
-          </div>
-        </>
-      )}
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-        @media (max-width: 540px)  { .stat-grid { grid-template-columns: 1fr !important; } }
-      `}</style>
-    </div>
+              {loading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    border: "2px solid rgba(15,164,175,0.15)", borderTopColor: C.accent,
+                    animation: "spin 0.9s linear infinite",
+                  }} />
+                </div>
+              ) : students.length === 0 ? (
+                <div style={{ padding: "56px 0", textAlign: "center" }}>
+                  <GraduationCap size={36} color={C.mutedLight} style={{ margin: "0 auto 12px" }} />
+                  <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>No students enrolled</p>
+                  <p style={{ fontSize: 12, color: C.body, marginTop: 5 }}>Students will appear here once enrolled in this course.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", minWidth: 500, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc" }}>
+                        {["Student", "Photos", "Photo Count", "Status"].map((h) => (
+                          <th key={h} style={{
+                            padding: "12px 24px", textAlign: "left",
+                            fontSize: 10.5, fontWeight: 700, color: C.muted,
+                            textTransform: "uppercase", letterSpacing: "0.09em",
+                            borderBottom: `1px solid ${C.border}`,
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.map((student, idx) => (
+                        <AttendanceStudentRow key={student.id} student={student} isLast={idx === students.length - 1} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
+            {/* Next steps hint */}
+            <div style={{
+              padding: "20px 24px", borderRadius: 16,
+              background: "rgba(15,164,175,0.05)",
+              border: `1px solid ${C.borderHov}`,
+            }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: C.primary, marginBottom: 10 }}>📋 Next Steps</p>
+              <ol style={{ paddingLeft: 18, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                {trainedCount === 0 ? (
+                  <>
+                    <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Make sure each student has captured photos using the photo tool.</li>
+                    <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Click <strong style={{ color: C.text }}>Train Recognition Model</strong> to generate face embeddings.</li>
+                    <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>After training, use <strong style={{ color: C.text }}>Capture Attendance</strong> to start a live session.</li>
+                  </>
+                ) : (
+                  <>
+                    <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Click <strong style={{ color: C.text }}>Capture Attendance</strong> to start the 45-minute AI session.</li>
+                    <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Ask students to look at the camera — face captures run automatically every 2 minutes.</li>
+                    <li style={{ fontSize: 13, color: C.body, lineHeight: 1.6 }}>Review results in the Reports section after the session ends.</li>
+                  </>
+                )}
+              </ol>
+              {untrainedCount > 0 && (
+                <div style={{
+                  marginTop: 14, padding: "10px 14px", borderRadius: 10,
+                  background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <AlertCircle size={14} color="#d97706" />
+                  <span style={{ fontSize: 12.5, color: "#92400e" }}>
+                    <strong>{untrainedCount}</strong> student{untrainedCount > 1 ? "s" : ""} still {untrainedCount > 1 ? "have" : "has"} no face embeddings — train the model to include them.
+                  </span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+          @media (max-width: 540px)  { .stat-grid { grid-template-columns: 1fr !important; } }
+        `}</style>
+      </div>
+    </>
   );
 }
 
@@ -541,7 +581,7 @@ function CourseOption({ course, isLast, onSelect }: {
 
 function AttendanceStudentRow({ student, isLast }: { student: CourseStudentItem; isLast: boolean }) {
   const [hov, setHov] = useState(false);
-  const trained = student.faceEmbedding;
+  const trained   = student.faceEmbedding;
   const hasPhotos = student.hasPhotos;
 
   return (
