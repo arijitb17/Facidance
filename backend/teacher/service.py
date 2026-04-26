@@ -12,6 +12,9 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
+import secrets
+import time
+
 import bcrypt
 from fastapi import HTTPException
 
@@ -38,6 +41,25 @@ def _hash_dob_password(dob: str) -> str:
     """
     cleaned = dob.replace("-", "").replace("/", "").replace(" ", "")
     return bcrypt.hashpw(cleaned.encode(), bcrypt.gensalt()).decode()
+
+
+def _parse_dt(date_str: str) -> datetime:
+    """
+    Parse ISO 8601 datetime strings, including those ending in 'Z'.
+    Python 3.10's fromisoformat() does not support the trailing 'Z';
+    this helper normalises it to '+00:00' before parsing.
+    """
+    return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+
+
+def _make_cuid() -> str:
+    """
+    Generate a cuid-compatible unique ID using stdlib only (no cuid package needed).
+    Format: c + hex-timestamp-ms + random-hex — 25 chars, collision-safe.
+    """
+    ts = format(int(time.time() * 1000), "x")   # hex ms timestamp
+    rand = secrets.token_hex(16)                  # 32 hex chars of randomness
+    return ("c" + ts + rand)[:25]                 # cuid length is 25
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +362,7 @@ async def train_student(
     photos_bytes: list[tuple[bytes, str]],  # [(content, filename), ...]
 ) -> dict:
     import httpx
- 
+
     student = await prisma.student.find_first(
         where={
             "id": student_id,
@@ -353,30 +375,27 @@ async def train_student(
             status_code=404,
             detail="Student not found or not enrolled in course",
         )
- 
+
     if len(photos_bytes) < 3:
         raise HTTPException(status_code=400, detail="3 photos required (front, left, right)")
- 
+
     async with httpx.AsyncClient(timeout=60.0) as client:
-        # ✅ Field name matches /api/process-student: studentId (camelCase)
-        # ✅ File field names match FastAPI params: front, left, right
         files = [
             ("front", (photos_bytes[0][1], photos_bytes[0][0], "image/jpeg")),
             ("left",  (photos_bytes[1][1], photos_bytes[1][0], "image/jpeg")),
             ("right", (photos_bytes[2][1], photos_bytes[2][0], "image/jpeg")),
         ]
-        data = {"studentId": student_id}   # ✅ camelCase matches Form(alias)
+        data = {"studentId": student_id}
         resp = await client.post(f"{PYTHON_API_URL}/api/process-student", data=data, files=files)
- 
+
         if resp.status_code == 422:
-            # Surface the face-detection error message to the caller
             detail = resp.json().get("detail", "Face validation failed")
             raise HTTPException(status_code=422, detail=detail)
         if resp.status_code != 200:
             raise HTTPException(status_code=502, detail=f"Python face service error: {resp.text}")
- 
+
         result = resp.json()
- 
+
     return {
         "success": True,
         "student_id": student_id,
@@ -389,14 +408,14 @@ async def train_student(
 # ---------------------------------------------------------------------------
 # Attendance — run-training  (proxy to Python face service)
 # ---------------------------------------------------------------------------
- 
+
 async def run_training(data) -> dict:
     import httpx
- 
+
     if not data.course_id:
         raise HTTPException(status_code=400, detail="Course ID required")
- 
-    async with httpx.AsyncClient(timeout=300.0) as client:   # ✅ 5 min — training is slow
+
+    async with httpx.AsyncClient(timeout=300.0) as client:
         resp = await client.post(
             f"{PYTHON_API_URL}/api/train",
             headers={"Content-Type": "application/json"},
@@ -407,7 +426,7 @@ async def run_training(data) -> dict:
                 detail=f"Training failed: {resp.text}",
             )
         result = resp.json()
- 
+
     return {
         "success": True,
         "message": "Training completed successfully",
@@ -418,7 +437,7 @@ async def run_training(data) -> dict:
 # ---------------------------------------------------------------------------
 # Attendance — recognize faces  (proxy to Python face service)
 # ---------------------------------------------------------------------------
- 
+
 async def recognize_faces(
     course_id: str,
     batch_id,
@@ -427,39 +446,36 @@ async def recognize_faces(
 ) -> dict:
     import httpx
     from datetime import datetime, timezone
- 
+
     if not course_id or not frames_bytes:
         raise HTTPException(status_code=400, detail="Missing required fields")
- 
+
     async with httpx.AsyncClient(timeout=120.0) as client:
-        # ✅ Field name matches Form param in face service: courseId
         files = [
             ("frames", (fname, content, "image/jpeg"))
             for content, fname in frames_bytes
         ]
         data = {"courseId": course_id}
         resp = await client.post(f"{PYTHON_API_URL}/api/recognize", data=data, files=files)
- 
+
         if resp.status_code != 200:
             raise HTTPException(
                 status_code=502,
                 detail=f"Recognition failed: {resp.text}",
             )
         results = resp.json()
- 
-    # In recognize_faces(), around line 456
+
     recognized_ids: list[str] = results.get("recognizedStudents", [])
 
-    # Enrich recognised IDs with student names from DB
     if recognized_ids:
         students = await prisma.student.find_many(
             where={"id": {"in": recognized_ids}},
             include={"user": True},
         )
     else:
-        students = []   
+        students = []
     student_map = {s.id: {"name": s.user.name, "email": s.user.email} for s in students}
- 
+
     enhanced = {
         **results,
         "recognizedStudents": [
@@ -474,11 +490,11 @@ async def recognize_faces(
         "courseId": course_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
- 
+
     attendance_result = None
     if auto_submit:
         attendance_result = await _do_submit_attendance(course_id, recognized_ids, None)
- 
+
     return {**enhanced, "attendance": attendance_result}
 
 
@@ -508,9 +524,22 @@ async def _do_submit_attendance(
     recognized_ids: list[str],
     date_str: Optional[str],
 ) -> dict:
-    attendance_date = datetime.fromisoformat(date_str) if date_str else datetime.now(timezone.utc)
-    start_of_day = attendance_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = attendance_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    # FIX: Attendance.timestamp is TIMESTAMP WITHOUT TIME ZONE in Postgres.
+    # asyncpg rejects timezone-aware datetimes against naive DB columns, so we
+    # always strip tzinfo and work in naive UTC throughout this function.
+    if date_str:
+        attendance_date = _parse_dt(date_str).replace(tzinfo=None)
+    else:
+        attendance_date = datetime.utcnow()
+
+    start_of_day = datetime(
+        attendance_date.year, attendance_date.month, attendance_date.day,
+        0, 0, 0, 0
+    )
+    end_of_day = datetime(
+        attendance_date.year, attendance_date.month, attendance_date.day,
+        23, 59, 59, 999999
+    )
 
     course = await prisma.course.find_unique(
         where={"id": course_id},
@@ -541,6 +570,7 @@ async def _do_submit_attendance(
         else:
             rec = await prisma.attendance.create(
                 data={
+                    "id": _make_cuid(),
                     "studentId": student.id,
                     "courseId": course_id,
                     "status": is_present,
@@ -605,16 +635,13 @@ async def get_attendance_history(course_id: str) -> dict:
 # Course students (detail view)
 # ---------------------------------------------------------------------------
 
-
 async def get_course_students(user_id: str, course_id: str) -> dict:
     """
     Full student list for a course with face-data status.
     Mirrors GET /api/teacher/courses/[courseId]/students
     """
 
-    # -------------------------------
     # 1. Validate course access
-    # -------------------------------
     course = await prisma.course.find_first(
         where={"id": course_id, "teacher": {"userId": user_id}},
         include={
@@ -633,9 +660,7 @@ async def get_course_students(user_id: str, course_id: str) -> dict:
     if not course:
         raise HTTPException(status_code=404, detail="Course not found or access denied")
 
-    # -------------------------------
     # 2. Get student IDs (join table)
-    # -------------------------------
     rows = await prisma.query_raw(
         'SELECT "B" as student_id FROM "_CourseStudents" WHERE "A" = $1',
         course_id
@@ -657,20 +682,16 @@ async def get_course_students(user_id: str, course_id: str) -> dict:
     # Sort in Python (ORM limitation)
     students = sorted(students, key=lambda s: s.user.name.lower())
 
-    # -------------------------------
-    # 4. Build student response
-    # -------------------------------
+    # 3. Build student response
     student_list = []
 
     async with httpx.AsyncClient(timeout=3.0) as client:
         for s in students:
 
-            # Attendance count
             attendance_count = await prisma.attendance.count(
                 where={"studentId": s.id, "courseId": course_id}
             )
 
-            # 🔥 Fetch photo info from Face Service
             try:
                 resp = await client.get(f"{PYTHON_API_URL}/api/student/{s.id}/photos")
                 if resp.status_code == 200:
@@ -704,20 +725,15 @@ async def get_course_students(user_id: str, course_id: str) -> dict:
                         else None
                     ),
                     "faceEmbedding": bool(getattr(s, "faceEmbedding", None)),
-
-                    # ✅ FIXED VALUES
                     "hasPhotos": photo_data["hasPhotos"],
                     "photoCount": photo_data["photoCount"],
-
                     "_count": {
                         "attendance": attendance_count
                     },
                 }
             )
 
-    # -------------------------------
-    # 5. Serialize course
-    # -------------------------------
+    # 4. Serialize course
     sem = course.semester
     ay = sem.academicYear if sem else None
     prog = ay.program if ay else None
@@ -738,6 +754,7 @@ async def get_course_students(user_id: str, course_id: str) -> dict:
         "students": student_list
     }
 
+
 # ---------------------------------------------------------------------------
 # Import students from CSV data
 # ---------------------------------------------------------------------------
@@ -747,7 +764,6 @@ async def import_students(course_id: str, user_id: str, data: ImportStudentsRequ
     Bulk-create or enrol students in a course from parsed CSV data.
     Mirrors POST /api/teacher/courses/[courseId]/import
     """
-    # Verify course belongs to teacher
     teacher = await prisma.teacher.find_unique(where={"userId": user_id})
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found")
@@ -779,7 +795,6 @@ async def import_students(course_id: str, user_id: str, data: ImportStudentsRequ
 
             if user:
                 if user.student:
-                    # Check if already enrolled
                     enrolment = await prisma.course.find_first(
                         where={
                             "id": course_id,
@@ -790,7 +805,6 @@ async def import_students(course_id: str, user_id: str, data: ImportStudentsRequ
                         existing.append(email)
                         continue
 
-                    # Enrol existing student
                     await prisma.query_raw(
                         'INSERT INTO "_CourseStudents" ("A", "B") VALUES ($1, $2) ON CONFLICT DO NOTHING',
                         course_id,
@@ -800,7 +814,6 @@ async def import_students(course_id: str, user_id: str, data: ImportStudentsRequ
                 else:
                     failed.append({"email": email, "reason": "User exists but is not a student"})
             else:
-                # Create user + student + enrolment
                 new_user = await prisma.user.create(
                     data={
                         "name": item.name,
@@ -812,7 +825,6 @@ async def import_students(course_id: str, user_id: str, data: ImportStudentsRequ
                         },
                     }
                 )
-                # Get newly created student record
                 new_student = await prisma.student.find_unique(
                     where={"userId": new_user.id}
                 )
@@ -936,9 +948,11 @@ async def get_report(
 
     date_filter: dict = {"courseId": course_id}
     if start_date:
-        date_filter.setdefault("timestamp", {})["gte"] = datetime.fromisoformat(start_date)
+        # FIX: parse 'Z'-suffixed ISO strings and strip tzinfo — DB column is naive
+        date_filter.setdefault("timestamp", {})["gte"] = _parse_dt(start_date).replace(tzinfo=None)
     if end_date:
-        end_dt = datetime.fromisoformat(end_date).replace(
+        # FIX: same — strip tzinfo, then clamp to end of day
+        end_dt = _parse_dt(end_date).replace(tzinfo=None).replace(
             hour=23, minute=59, second=59, microsecond=999999
         )
         date_filter.setdefault("timestamp", {})["lte"] = end_dt
@@ -1060,6 +1074,7 @@ async def send_credentials(data: SendCredentialsRequest) -> dict:
                 failed.append(student.email)
 
     return {"success": True, "message": "Emails sent successfully", "sent": sent, "failed": failed}
+
 
 async def get_at_risk_students(user_id: str) -> list[dict]:
     teacher = await prisma.teacher.find_unique(where={"userId": user_id})
