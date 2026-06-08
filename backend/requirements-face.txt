@@ -37,3 +37,9 @@ Pillow==10.2.0
 mediapipe==0.10.9
 matplotlib==3.8.2
 onnxruntime==1.17.0
+
+# ---------------------------
+# Monitoring
+# ---------------------------
+prometheus-client==0.20.0
+prometheus-fastapi-instrumentator==6.1.0

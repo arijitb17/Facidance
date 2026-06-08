@@ -1,0 +1,68 @@
+global:
+  scrape_interval: 15s       # How often to scrape targets
+  evaluation_interval: 15s   # How often to evaluate rules
+  scrape_timeout: 10s
+
+# ── Alerting (optional — wire up Alertmanager later) ──────────────────
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+# ── Recording / alerting rules (optional) ─────────────────────────────
+# rule_files:
+#   - "rules/*.yml"
+
+scrape_configs:
+
+  # ── Prometheus itself ────────────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── Auth service  (port 8000) ────────────────────────────────────────
+  - job_name: auth
+    static_configs:
+      - targets: ["auth:8000"]
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: auth
+
+  # ── Admin service  (port 8001) ───────────────────────────────────────
+  - job_name: admin
+    static_configs:
+      - targets: ["admin:8001"]
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: admin
+
+  # ── Teacher service  (port 8002) ─────────────────────────────────────
+  - job_name: teacher
+    static_configs:
+      - targets: ["teacher:8002"]
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: teacher
+
+  # ── Student service  (port 8003) ─────────────────────────────────────
+  - job_name: student
+    static_configs:
+      - targets: ["student:8003"]
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: student
+
+  # ── Face-recognition service  (port 8004) ────────────────────────────
+  # face is on face_net (internal:true), but Prometheus is also on face_net
+  # so it can reach it. nginx/public traffic still cannot.
+  - job_name: face
+    static_configs:
+      - targets: ["face:8004"]
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: face

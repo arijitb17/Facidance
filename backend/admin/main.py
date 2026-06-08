@@ -6,20 +6,37 @@ Runs on port 8001.
 
 Start with:
     uvicorn backend.admin.main:app --port 8001 --reload
+
+Metrics
+-------
+GET /metrics  — Prometheus text exposition (scrape this endpoint).
+
+The instrumentator automatically tracks:
+  - http_requests_total{method, handler, status}
+  - http_request_duration_seconds{method, handler, status}
+  - http_request_size_bytes / http_response_size_bytes
+  - in_progress requests gauge
+
+Business-level metrics (teacher/department/course/student ops, analytics
+latency, auto-graduations) are defined in backend/common/metrics.py and
+incremented in backend/admin/service.py.
 """
 
 from contextlib import asynccontextmanager
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from backend.common.prisma_client import connect, disconnect
 from backend.admin.router import router
 
+import backend.common.metrics  # noqa: F401  (side-effect import)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Connect Prisma on startup, disconnect on shutdown."""
     await connect()
     yield
     await disconnect()
@@ -35,7 +52,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow Next.js frontend (adjust origins for production)
+Instrumentator(
+    should_group_status_codes=False,
+    excluded_handlers=["/health", "/metrics"],
+).instrument(app).expose(app, include_in_schema=False)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],

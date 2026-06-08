@@ -1,0 +1,78 @@
+# docker-compose.monitoring.yml
+#
+# Monitoring overlay — adds Prometheus + Grafana to your stack.
+#
+# LOCAL dev:
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up
+#
+# PROD:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml up
+#
+# Access:
+#   Prometheus → internal only (no public port in prod)
+#   Grafana    → https://facidance.online/grafana/
+#
+# ── Recommended Grafana dashboard IDs (paste in Import) ─────────────────────
+#   FastAPI / Uvicorn:  17927   ← best match for prometheus_fastapi_instrumentator
+#   Node exporter:      1860    ← host OS metrics (if you add node-exporter)
+#   PostgreSQL:         9628    ← if you add postgres-exporter later
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    # No ports: — Prometheus is internal only in prod.
+    # For local dev, override with: ports: ["9090:9090"]
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana-oss:10.4.3
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    # No ports: — nginx proxies /grafana/ → grafana:3000 internally.
+    # For local dev, override with: ports: ["3001:3000"]
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  internal:
+    external: true
+    name: facidance_internal

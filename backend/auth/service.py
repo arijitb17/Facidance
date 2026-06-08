@@ -3,11 +3,14 @@ backend/auth/service.py
 
 Pure business logic for authentication.
 No HTTP concerns — only DB access and token generation.
+
+Prometheus metrics are recorded here (closest to the business event).
 """
 
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from datetime import datetime
 
@@ -17,6 +20,13 @@ from fastapi import HTTPException, status
 
 from backend.common.prisma_client import prisma
 from backend.auth.schemas import LoginRequest, RegisterTeacherRequest
+from backend.common.metrics import (
+    LOGIN_ATTEMPTS_TOTAL,
+    LOGIN_DURATION_SECONDS,
+    REGISTRATION_ATTEMPTS_TOTAL,
+    REGISTRATION_DURATION_SECONDS,
+    TOKENS_ISSUED_TOTAL,
+)
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "changeme-use-env-in-production")
 JWT_ALGORITHM = "HS256"
@@ -61,8 +71,6 @@ def _hash_password(plain: str) -> str:
 
 def _generate_token(user_id: str, role: str) -> str:
     """Sign a JWT valid for 7 days (mirrors generateToken in lib/auth.ts)."""
-    import time
-
     payload = {
         "id": user_id,
         "userId": user_id,   # kept for Next.js middleware compatibility
@@ -87,31 +95,49 @@ async def login(data: LoginRequest) -> dict:
     Authenticate a user by email + password.
     Returns token, role, name, email, redirect_url.
     Mirrors POST /api/auth/login (Next.js route).
+
+    Metrics recorded:
+      - auth_login_attempts_total{status}
+      - auth_login_duration_seconds
+      - auth_tokens_issued_total{role}   (on success only)
     """
+    t0 = time.perf_counter()
     email = data.email.lower().strip()
-    user = await prisma.user.find_unique(where={"email": email})
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
+    try:
+        user = await prisma.user.find_unique(where={"email": email})
 
-    if not _verify_password(data.password, user.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
+        if not user:
+            LOGIN_ATTEMPTS_TOTAL.labels(status="failure_not_found").inc()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
 
-    token = _generate_token(user.id, user.role)
+        if not _verify_password(data.password, user.password):
+            LOGIN_ATTEMPTS_TOTAL.labels(status="failure_bad_credentials").inc()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
 
-    return {
-        "token": token,
-        "role": user.role,
-        "name": user.name,
-        "email": user.email,
-        "redirect_url": _redirect_for_role(user.role),
-    }
+        token = _generate_token(user.id, user.role)
+
+        # ── success path ──────────────────────────────────────────────────
+        LOGIN_ATTEMPTS_TOTAL.labels(status="success").inc()
+        TOKENS_ISSUED_TOTAL.labels(role=user.role).inc()
+
+        return {
+            "token": token,
+            "role": user.role,
+            "name": user.name,
+            "email": user.email,
+            "redirect_url": _redirect_for_role(user.role),
+        }
+
+    finally:
+        # Always record duration, whether success or failure.
+        LOGIN_DURATION_SECONDS.observe(time.perf_counter() - t0)
 
 
 # ---------------------------------------------------------------------------
@@ -123,29 +149,48 @@ async def register_teacher(data: RegisterTeacherRequest) -> dict:
     Create a User(TEACHER) with no Teacher record yet.
     Status is implicitly PENDING — admin must approve and assign a department.
     Mirrors POST /api/auth/register-teacher (Next.js route).
+
+    Metrics recorded:
+      - auth_registration_attempts_total{status}
+      - auth_registration_duration_seconds
     """
+    t0 = time.perf_counter()
     email = data.email.lower().strip()
 
-    existing = await prisma.user.find_unique(where={"email": email})
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+    try:
+        existing = await prisma.user.find_unique(where={"email": email})
+        if existing:
+            REGISTRATION_ATTEMPTS_TOTAL.labels(status="conflict_email").inc()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
+        hashed = _hash_password(data.password)
+        user = await prisma.user.create(
+            data={
+                "id": str(uuid.uuid4()),
+                "name": data.name,
+                "email": email,
+                "password": hashed,
+                "role": "TEACHER",
+                "updatedAt": datetime.utcnow(),
+            }
         )
 
-    hashed = _hash_password(data.password)
-    user = await prisma.user.create(
-        data={
-            "id": str(uuid.uuid4()),
-            "name": data.name,
-            "email": email,
-            "password": hashed,
-            "role": "TEACHER",
-            "updatedAt": datetime.utcnow(),
-        }
-    )
+        REGISTRATION_ATTEMPTS_TOTAL.labels(status="success").inc()
 
-    return {
-        "message": "Teacher registration submitted. Awaiting admin approval.",
-        "user_id": user.id,
-    }
+        return {
+            "message": "Teacher registration submitted. Awaiting admin approval.",
+            "user_id": user.id,
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        REGISTRATION_ATTEMPTS_TOTAL.labels(status="error").inc()
+        raise
+
+    finally:
+        REGISTRATION_DURATION_SECONDS.observe(time.perf_counter() - t0)

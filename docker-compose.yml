@@ -37,8 +37,6 @@ services:
     working_dir: /app
     volumes:
       - ./prisma:/app/prisma
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
     command: >
       sh -c "apt-get update -y && apt-get install -y openssl &&
             npm install -g prisma@5 &&
@@ -56,12 +54,10 @@ services:
     volumes:
       - ./prisma:/app/prisma
       - ./backend:/app/backend
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
     command: >
       sh -c "apt-get update -y && apt-get install -y openssl &&
              npm install -g prisma@5 &&
-             npm install @prisma/client@5 &&
+             npm install @prisma/client@5 bcryptjs &&
              prisma generate --schema=/app/prisma/schema.prisma &&
              node /app/prisma/seed.cjs"
     depends_on:
