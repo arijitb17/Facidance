@@ -38,7 +38,6 @@ from backend.common.metrics import (
     FACE_RECOGNIZE_OP_DURATION_SECONDS,
     FACE_RECOGNIZE_OPS_TOTAL,
     FACE_RECOGNIZE_STUDENTS_MATCHED_TOTAL,
-    FACE_SERVICE_INFO,
     FACE_TRAIN_DB_UPDATE_TOTAL,
     FACE_TRAIN_IMAGES_PROCESSED_TOTAL,
     FACE_TRAIN_OP_DURATION_SECONDS,
@@ -75,7 +74,7 @@ def get_face_app():
             _face_app.prepare(ctx_id=0, det_size=(640, 640))
             FACE_MODEL_LOAD_TOTAL.labels(status="success").inc()
             logger.info("InsightFace model loaded")
-        except Exception as e:
+        except Exception:
             FACE_MODEL_LOAD_TOTAL.labels(status="error").inc()
             raise
         finally:
