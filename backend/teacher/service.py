@@ -26,7 +26,6 @@ from backend.teacher.schemas import (
     SubmitAttendanceRequest,
     SendCredentialsRequest,
     RemoveStudentRequest,
-    SessionStartRequest,
 )
 import httpx
 from backend.common.cache import cache_get, cache_set, cache_invalidate
@@ -54,7 +53,6 @@ def _to_ist(dt: datetime) -> datetime:
 ACTIVE_SESSIONS: dict[str, dict[str, set[str]]] = {}
 
 
-import time
 
 def _ensure_session(course_id: str) -> dict:
     """Get or create an active session entry for a course."""
