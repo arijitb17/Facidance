@@ -141,6 +141,9 @@ services:
       NEXT_PUBLIC_ADMIN_API_URL:   ${NEXT_PUBLIC_ADMIN_API_URL}
       NEXT_PUBLIC_TEACHER_API_URL: ${NEXT_PUBLIC_TEACHER_API_URL}
       NEXT_PUBLIC_STUDENT_API_URL: ${NEXT_PUBLIC_STUDENT_API_URL}
+    volumes:
+      # Mount the VPS host's PM2 logs into the nextjs user's home directory
+      - ~/.pm2/logs:/home/nextjs/.pm2/logs:ro
       
     depends_on: [auth, admin, teacher, student]
     networks: [internal]
