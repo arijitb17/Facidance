@@ -47,7 +47,21 @@ function InputField({
       }}>
         {label}
       </label>
-      <div style={{ position: "relative" }}>
+      <div style={{ 
+        position: "relative",
+        width: "100%",
+        padding: suffix ? "12px 48px 12px 16px" : "12px 16px",
+        borderRadius: 12,
+        border: `1px solid ${focused ? C.borderHov : C.border}`,
+        background: focused ? C.white : "#f8fafc",
+        boxShadow: focused
+          ? `0 0 0 3px rgba(15,164,175,0.12), ${SHADOW_REST}`
+          : SHADOW_REST,
+        transition: EASE_ALL,
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center"
+      }}>
         <input
           type={type}
           value={value}
@@ -59,16 +73,13 @@ function InputField({
           required
           style={{
             width: "100%",
-            padding: suffix ? "12px 48px 12px 16px" : "12px 16px",
-            borderRadius: 12,
-            border: `1px solid ${focused ? C.borderHov : C.border}`,
-            background: focused ? C.white : "#f8fafc",
-            color: C.text, fontSize: 14, outline: "none",
-            boxShadow: focused
-              ? `0 0 0 3px rgba(15,164,175,0.12), ${SHADOW_REST}`
-              : SHADOW_REST,
-            transition: EASE_ALL,
-            boxSizing: "border-box",
+            border: "none",
+            background: "transparent",
+            color: C.text, 
+            fontSize: 14, 
+            outline: "none",
+            padding: 0,
+            margin: 0,
           }}
         />
         {suffix && (
@@ -160,6 +171,8 @@ export default function RegisterTeacherPage() {
             alt="Department of Information Technology, Gauhati University"
             fill
             priority
+            quality={70}
+            sizes="(max-width: 768px) 100vw, 50vw"
             style={{ objectFit: "cover", objectPosition: "center top" }}
           />
 
@@ -365,7 +378,7 @@ export default function RegisterTeacherPage() {
       lineHeight: 1.1,
     }}
   >
-    Faculty registration 👋
+    Faculty registration 
   </h1>
 
   <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>

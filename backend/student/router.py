@@ -3,23 +3,19 @@ backend/student/router.py
 
 All student HTTP endpoints.
 Router → Service ONLY. No DB calls here.
-
-Wraps service calls to catch unexpected exceptions and increment
-STUDENT_UNHANDLED_ERRORS_TOTAL before re-raising, matching the pattern
-used in the auth and admin services.
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 
 from backend.admin.dependencies import get_current_student
 from backend.student import service
 from backend.student.schemas import JoinCourseRequest, UpdateProfileRequest
-from backend.common.metrics import STUDENT_UNHANDLED_ERRORS_TOTAL
 
 router = APIRouter(prefix="/student", tags=["Student"])
 
+# Type alias for cleaner signatures
 StudentUser = Annotated[dict, Depends(get_current_student)]
 
 
@@ -27,147 +23,92 @@ StudentUser = Annotated[dict, Depends(get_current_student)]
 # Me / Profile
 # ---------------------------------------------------------------------------
 
-@router.get("/me")
+@router.get("/me", summary="Get the authenticated student's profile")
 async def get_me(current: StudentUser):
-    try:
-        return await service.get_me(current["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/me").inc()
-        raise
+    return await service.get_me(current["id"])
 
 
-@router.patch("/profile")
+@router.patch("/profile", summary="Update student name / email")
 async def update_profile(body: UpdateProfileRequest, current: StudentUser):
-    try:
-        return await service.update_profile(current["id"], body)
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/profile").inc()
-        raise
+    return await service.update_profile(current["id"], body)
 
 
-@router.get("/check-photos")
+@router.get("/check-photos", summary="Check whether the student has a face embedding")
 async def check_photos(student_id: str, current: StudentUser):
-    try:
-        me = await service.get_me(current["id"])
-        if not me.get("student") or me["student"]["id"] != student_id:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        return await service.check_photos(student_id)
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/check-photos").inc()
-        raise
+    """
+    Query param: ?student_id=<Student.id>
+    Validates the student_id belongs to the calling user before checking.
+    """
+    # Ensure the student can only check their own photos
+    me = await service.get_me(current["id"])
+    if not me.get("student") or me["student"]["id"] != student_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return await service.check_photos(student_id)
 
 
 # ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------
 
-@router.get("/stats")
+@router.get("/stats", summary="Dashboard stats: courses, attendance %, total present")
 async def get_stats(current: StudentUser):
-    try:
-        return await service.get_stats(current["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/stats").inc()
-        raise
+    return await service.get_stats(current["id"])
 
 
-@router.get("/ai-suggestions")
+@router.get(
+    "/ai-suggestions",
+    summary="Get AI-powered attendance improvement suggestions",
+)
 async def ai_suggestions(current: StudentUser):
-    try:
-        return await service.get_ai_suggestions(current["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/ai-suggestions").inc()
-        raise
-
+    return await service.get_ai_suggestions(current["id"])
 
 # ---------------------------------------------------------------------------
 # Courses
 # ---------------------------------------------------------------------------
 
-@router.get("/courses")
+@router.get("/courses", summary="List all enrolled courses")
 async def list_courses(current: StudentUser):
-    try:
-        courses = await service.list_courses(current["id"])
-        return {"courses": courses}
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/courses").inc()
-        raise
+    courses = await service.list_courses(current["id"])
+    return {"courses": courses}
 
 
-@router.get("/courses/{course_id}")
+@router.get("/courses/{course_id}", summary="Get a single enrolled course's detail")
 async def get_course(
     course_id: Annotated[str, Path()],
     current: StudentUser,
 ):
-    try:
-        return await service.get_course(current["id"], course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/courses/{course_id}").inc()
-        raise
+    return await service.get_course(current["id"], course_id)
 
 
-@router.post("/courses/join")
+@router.post("/courses/join", summary="Join a course using its entry code")
 async def join_course(body: JoinCourseRequest, current: StudentUser):
-    try:
-        return await service.join_course(current["id"], body)
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/courses/join").inc()
-        raise
+    return await service.join_course(current["id"], body)
 
 
-@router.delete("/courses/{course_id}/leave")
+@router.delete("/courses/{course_id}/leave", summary="Leave an enrolled course")
 async def leave_course(
     course_id: Annotated[str, Path()],
     current: StudentUser,
 ):
-    try:
-        return await service.leave_course(current["id"], course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/courses/{course_id}/leave").inc()
-        raise
+    return await service.leave_course(current["id"], course_id)
 
 
 # ---------------------------------------------------------------------------
 # Attendance
 # ---------------------------------------------------------------------------
 
-@router.get("/courses/{course_id}/attendance")
+@router.get(
+    "/courses/{course_id}/attendance",
+    summary="Attendance records for a specific course",
+)
 async def course_attendance(
     course_id: Annotated[str, Path()],
     current: StudentUser,
 ):
-    try:
-        return await service.get_course_attendance(current["id"], course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/courses/{course_id}/attendance").inc()
-        raise
+    return await service.get_course_attendance(current["id"], course_id)
 
 
-@router.get("/history")
+@router.get("/history", summary="Full attendance history across all courses")
 async def attendance_history(current: StudentUser):
-    try:
-        return await service.get_attendance_history(current["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        STUDENT_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/student/history").inc()
-        raise
+    return await service.get_attendance_history(current["id"])

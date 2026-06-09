@@ -214,7 +214,7 @@ export async function uploadPhotos(studentId: string, photos: { front?: File; le
   if (photos.left) formData.append("left", photos.left);
   if (photos.right) formData.append("right", photos.right);
 
-  const res = await fetch("http://localhost:8004/api/process-student", {
+  const res = await fetch("/face-api/api/process-student", {
     method: "POST",
     body: formData,
   });
@@ -244,18 +244,5 @@ export async function uploadPhotos(studentId: string, photos: { front?: File; le
     throw new Error(`Face detection failed - ${failures.join(", ")}`);
   }
 
-  const trainRes = await fetch("http://localhost:8004/api/train", {
-    method: "POST",
-  });
-
-  if (!trainRes.ok) {
-    let detail = `Train HTTP ${trainRes.status}`;
-    try {
-      const body = await trainRes.json();
-      detail = body?.detail ?? body?.error ?? detail;
-    } catch {}
-    throw new Error(detail);
-  }
-
-  return { message: "Photos uploaded and face model updated successfully!", studentId };
+  return { message: "Photos uploaded successfully!", studentId };
 }

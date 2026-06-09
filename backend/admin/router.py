@@ -3,15 +3,11 @@ backend/admin/router.py
 
 All admin HTTP endpoints.
 Router → Service ONLY. No DB calls here.
-
-Wraps service calls to catch unexpected exceptions and increment
-ADMIN_UNHANDLED_ERRORS_TOTAL before re-raising, matching the pattern
-used in the auth service.
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 
 from backend.admin.dependencies import get_current_admin
 from backend.admin import service
@@ -23,11 +19,13 @@ from backend.admin.schemas import (
     CreateTeacherRequest,
     UpdateCourseTeacherRequest,
     UpdateStudentRequest,
+    UpdateProgramRequest,
+    UpdateTeacherDepartmentRequest,
 )
-from backend.common.metrics import ADMIN_UNHANDLED_ERRORS_TOTAL
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
+# Type alias for cleaner signatures
 AdminUser = Annotated[dict, Depends(get_current_admin)]
 
 
@@ -35,308 +33,192 @@ AdminUser = Annotated[dict, Depends(get_current_admin)]
 # Stats
 # ---------------------------------------------------------------------------
 
-@router.get("/stats")
+@router.get("/stats", summary="Get institution-wide counts")
 async def get_stats(_: AdminUser):
-    try:
-        return await service.get_stats()
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/stats").inc()
-        raise
+    return await service.get_stats()
 
 
 # ---------------------------------------------------------------------------
 # Teachers
 # ---------------------------------------------------------------------------
 
-@router.get("/teachers")
+@router.get("/teachers", summary="List all teachers (approved + pending)")
 async def list_teachers(_: AdminUser):
-    try:
-        teachers = await service.get_teachers()
-        return {"teachers": teachers}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/teachers").inc()
-        raise
+    teachers = await service.get_teachers()
+    return {"teachers": teachers}
 
 
-@router.post("/approve-teacher")
+@router.post("/approve-teacher", summary="Approve a teacher and assign to department")
 async def approve_teacher(body: ApproveTeacherRequest, _: AdminUser):
-    try:
-        return await service.approve_teacher(body)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/approve-teacher").inc()
-        raise
+    return await service.approve_teacher(body)
 
 
-@router.post("/teachers")
+@router.post("/teachers", summary="Create a teacher account directly")
 async def create_teacher(body: CreateTeacherRequest, _: AdminUser):
-    try:
-        return await service.create_teacher(body)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/teachers").inc()
-        raise
+    return await service.create_teacher(body)
 
 
-@router.delete("/teachers/{user_id}")
+@router.delete("/teachers/{user_id}", summary="Delete a teacher by User ID")
 async def delete_teacher(
     user_id: Annotated[str, Path(description="User.id of the teacher")],
     _: AdminUser,
 ):
-    try:
-        return await service.delete_teacher(user_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/teachers/{user_id}").inc()
-        raise
+    return await service.delete_teacher(user_id)
+
+
+@router.patch("/teachers/{user_id}", summary="Update a teacher's department")
+async def update_teacher_department(
+    user_id: Annotated[str, Path(description="User.id of the teacher")],
+    body: UpdateTeacherDepartmentRequest,
+    _: AdminUser,
+):
+    return await service.update_teacher_department(user_id, body.department_id)
 
 
 # ---------------------------------------------------------------------------
 # Departments
 # ---------------------------------------------------------------------------
 
-@router.get("/departments")
+@router.get("/departments", summary="List all departments")
 async def list_departments(_: AdminUser):
-    try:
-        depts = await service.get_departments()
-        return {"departments": depts}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/departments").inc()
-        raise
+    depts = await service.get_departments()
+    return {"departments": depts}
 
 
-@router.post("/departments")
+@router.post("/departments", summary="Create a department")
 async def create_department(body: CreateDepartmentRequest, _: AdminUser):
-    try:
-        dept = await service.create_department(body)
-        return {"department": dept}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/departments").inc()
-        raise
+    dept = await service.create_department(body)
+    return {"department": dept}
 
 
-@router.delete("/departments/{dept_id}")
-async def delete_department(dept_id: Annotated[str, Path()], _: AdminUser):
-    try:
-        return await service.delete_department(dept_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/departments/{dept_id}").inc()
-        raise
+@router.delete("/departments/{dept_id}", summary="Delete a department (cascade)")
+async def delete_department(
+    dept_id: Annotated[str, Path()],
+    _: AdminUser,
+):
+    return await service.delete_department(dept_id)
 
 
 # ---------------------------------------------------------------------------
 # Programs
 # ---------------------------------------------------------------------------
 
-@router.get("/programs")
+@router.get("/programs", summary="List all programs")
 async def list_programs(_: AdminUser):
-    try:
-        progs = await service.get_programs()
-        return {"programs": progs}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/programs").inc()
-        raise
+    progs = await service.get_programs()
+    return {"programs": progs}
 
 
-@router.post("/programs")
+@router.post("/programs", summary="Create a program")
 async def create_program(body: CreateProgramRequest, _: AdminUser):
-    try:
-        prog = await service.create_program(body)
-        return {"program": prog}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/programs").inc()
-        raise
+    prog = await service.create_program(body)
+    return {"program": prog}
 
 
-@router.delete("/programs/{program_id}")
+@router.delete("/programs/{program_id}", summary="Delete a program")
 async def delete_program(program_id: Annotated[str, Path()], _: AdminUser):
-    try:
-        return await service.delete_program(program_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/programs/{program_id}").inc()
-        raise
+    return await service.delete_program(program_id)
+
+
+@router.patch("/programs/{program_id}", summary="Reassign a program to a different department")
+async def update_program(
+    program_id: Annotated[str, Path()],
+    body: UpdateProgramRequest,
+    _: AdminUser,
+):
+    prog = await service.update_program(program_id, body)
+    return {"program": prog}
 
 
 # ---------------------------------------------------------------------------
 # Courses
 # ---------------------------------------------------------------------------
 
-@router.get("/courses")
+@router.get("/courses", summary="List all courses with full relations")
 async def list_courses(_: AdminUser):
-    try:
-        courses = await service.get_courses()
-        return {"courses": courses}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/courses").inc()
-        raise
+    courses = await service.get_courses()
+    return {"courses": courses}
 
 
-@router.post("/courses")
+@router.post("/courses", summary="Create a course with auto-generated code")
 async def create_course(body: CreateCourseRequest, _: AdminUser):
-    try:
-        course = await service.create_course(body)
-        return {"course": course}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/courses").inc()
-        raise
+    course = await service.create_course(body)
+    return {"course": course}
 
 
-@router.patch("/courses/{course_id}")
+@router.patch("/courses/{course_id}", summary="Reassign teacher for a course")
 async def update_course_teacher(
     course_id: Annotated[str, Path()],
     body: UpdateCourseTeacherRequest,
     _: AdminUser,
 ):
-    try:
-        course = await service.update_course_teacher(course_id, body.teacher_id)
-        return {"course": course}
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/courses/{course_id}").inc()
-        raise
+    course = await service.update_course_teacher(course_id, body.teacher_id)
+    return {"course": course}
 
 
-@router.delete("/courses/{course_id}")
+@router.delete("/courses/{course_id}", summary="Delete a course and its attendance")
 async def delete_course(course_id: Annotated[str, Path()], _: AdminUser):
-    try:
-        return await service.delete_course(course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/courses/{course_id}").inc()
-        raise
+    return await service.delete_course(course_id)
 
 
 # ---------------------------------------------------------------------------
 # Students
 # ---------------------------------------------------------------------------
 
-@router.get("/students")
+@router.get("/students", summary="List all students with auto-graduation logic")
 async def list_students(_: AdminUser):
-    try:
-        return await service.get_students()
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/students").inc()
-        raise
+    return await service.get_students()
 
 
-@router.patch("/students/{user_id}")
+@router.patch("/students/{user_id}", summary="Update student name / email / program")
 async def update_student(
     user_id: Annotated[str, Path()],
     body: UpdateStudentRequest,
     _: AdminUser,
 ):
-    try:
-        return await service.update_student(user_id, body)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/students/{user_id}").inc()
-        raise
+    return await service.update_student(user_id, body)
 
 
-@router.delete("/students/{user_id}")
+@router.delete("/students/{user_id}", summary="Delete a student")
 async def delete_student(user_id: Annotated[str, Path()], _: AdminUser):
-    try:
-        return await service.delete_student(user_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/students/{user_id}").inc()
-        raise
+    return await service.delete_student(user_id)
 
 
-@router.post("/students/{user_id}/graduate")
+@router.post("/students/{user_id}/graduate", summary="Mark a student as graduated")
 async def graduate_student(user_id: Annotated[str, Path()], _: AdminUser):
-    try:
-        return await service.graduate_student(user_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/students/{user_id}/graduate").inc()
-        raise
+    return await service.graduate_student(user_id)
 
 
-@router.post("/students/{user_id}/ungraduate")
+@router.post("/students/{user_id}/ungraduate", summary="Mark a student as active")
 async def ungraduate_student(user_id: Annotated[str, Path()], _: AdminUser):
-    try:
-        return await service.ungraduate_student(user_id)
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/students/{user_id}/ungraduate").inc()
-        raise
+    return await service.ungraduate_student(user_id)
 
 
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------
 
-@router.get("/analytics/overview")
+@router.get("/analytics/overview", summary="Aggregated metrics for admin dashboard")
 async def analytics_overview(_: AdminUser):
-    try:
-        return await service.get_analytics_overview()
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/analytics/overview").inc()
-        raise
+    return await service.get_analytics_overview()
 
 
-@router.get("/analytics/attendance-trends")
+@router.get(
+    "/analytics/attendance-trends",
+    summary="Monthly attendance rates (last 12 months)",
+)
 async def attendance_trends(_: AdminUser):
-    try:
-        return await service.get_attendance_trends()
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/analytics/attendance-trends").inc()
-        raise
+    return await service.get_attendance_trends()
 
 
-@router.get("/analytics/teacher-load")
+@router.get("/analytics/teacher-load", summary="Courses and students per teacher")
 async def teacher_load(_: AdminUser):
-    try:
-        return await service.get_teacher_load()
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/analytics/teacher-load").inc()
-        raise
+    return await service.get_teacher_load()
 
 
-@router.get("/analytics/program-distribution")
+@router.get(
+    "/analytics/program-distribution",
+    summary="Student count per program",
+)
 async def program_distribution(_: AdminUser):
-    try:
-        return await service.get_program_distribution()
-    except HTTPException:
-        raise
-    except Exception:
-        ADMIN_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/admin/analytics/program-distribution").inc()
-        raise
+    return await service.get_program_distribution()

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 export type ToastType = "success" | "error" | "info" | "warning";
 
@@ -31,7 +31,7 @@ export function useToast() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (title: string, description?: string, duration?: number) =>
       addToast("success", title, description, duration),
     error: (title: string, description?: string, duration?: number) =>
@@ -40,7 +40,7 @@ export function useToast() {
       addToast("info", title, description, duration),
     warning: (title: string, description?: string, duration?: number) =>
       addToast("warning", title, description, duration),
-  };
+  }), [addToast]);
 
   return { toasts, toast, removeToast };
 }

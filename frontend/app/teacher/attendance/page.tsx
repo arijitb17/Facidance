@@ -156,7 +156,8 @@ export default function TeacherAttendance() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [students, setStudents] = useState<CourseStudentItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [training, setTraining] = useState(false);
+  const [isStartingTraining, setIsStartingTraining] = useState(false);
+  const [isModelTraining, setIsModelTraining] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
   const allCourses = useMemo<FlattenedCourse[]>(() => {
@@ -192,6 +193,8 @@ export default function TeacherAttendance() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
+
   async function fetchCourseStudents(courseId: string) {
     setLoading(true);
     setCurrentView("students"); // switch view immediately
@@ -220,17 +223,23 @@ export default function TeacherAttendance() {
       toast.info("Already trained", "All students already have face embeddings.");
       return;
     }
-    setTraining(true);
-    toast.info("Training started", `Processing ${untrainedCount} student(s) — this may take a few minutes…`);
+    setIsStartingTraining(true);
+    setIsModelTraining(true);
     try {
       const { teacherAttendanceApi } = await import("@/lib/teacher-api");
       const data = await teacherAttendanceApi.runTraining(selectedCourse.id);
-      toast.success("Training complete", data.message);
-      fetchCourseStudents(selectedCourse.id);
+      if (data.trained_count > 0) {
+        toast.success("Training Complete!", data.message || `Trained ${data.trained_count} student(s) successfully.`);
+      } else {
+        toast.info("Already Up-to-Date", data.message || "No new students needed training.");
+      }
+      // Refresh student list to update trained/untrained counts
+      await fetchCourseStudents(selectedCourse.id);
     } catch (e) {
       toast.error("Training failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
-      setTraining(false);
+      setIsStartingTraining(false);
+      setIsModelTraining(false);
     }
   }
 
@@ -408,17 +417,17 @@ export default function TeacherAttendance() {
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
-              <ActionBtn variant="warning" onClick={handleTrainStudents} disabled={training || loading}>
+              <ActionBtn variant="warning" onClick={handleTrainStudents} disabled={isStartingTraining || loading || isModelTraining}>
                 <Sparkles size={17} />
-                {training ? "Training model…" : "Train Recognition Model"}
+                {isStartingTraining ? "Initiating…" : "Train Recognition Model"}
               </ActionBtn>
-              <ActionBtn variant="primary" onClick={handleCaptureAttendance} disabled={loading || trainedCount === 0}>
+              <ActionBtn variant="primary" onClick={handleCaptureAttendance} disabled={loading || trainedCount === 0 || isModelTraining}>
                 <PlayCircle size={17} />
                 Capture Attendance
               </ActionBtn>
             </div>
 
-            {training && (
+            {isModelTraining && (
               <div style={{
                 display: "flex", alignItems: "center", gap: 12,
                 padding: "14px 20px", borderRadius: 14,
@@ -433,7 +442,7 @@ export default function TeacherAttendance() {
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "#92400e" }}>Training face recognition model…</p>
                   <p style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
-                    This can take several minutes depending on the number of students. Please keep this page open.
+                    Processing new students. This should only take a few seconds.
                   </p>
                 </div>
               </div>
@@ -495,7 +504,7 @@ export default function TeacherAttendance() {
               background: "rgba(15,164,175,0.05)",
               border: `1px solid ${C.borderHov}`,
             }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: C.primary, marginBottom: 10 }}>📋 Next Steps</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: C.primary, marginBottom: 10 }}>Next Steps</p>
               <ol style={{ paddingLeft: 18, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
                 {trainedCount === 0 ? (
                   <>

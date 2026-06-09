@@ -287,7 +287,7 @@ export const teacherAttendanceApi = {
   },
 
   runTraining: (courseId: string) =>
-    apiFetch<{ success: boolean; message: string; results: unknown }>(
+    apiFetch<{ success: boolean; message: string; trained_count: number; total_images: number; results?: unknown }>(
       "/teacher/attendance/run-training",
       {
         method: "POST",
@@ -347,6 +347,53 @@ export const teacherAttendanceApi = {
         body: JSON.stringify({ course_id: courseId, student_id: studentId, date }),
       }
     ),
+
+  getActiveSession: (courseId: string) =>
+    apiFetch<{
+      course_id: string;
+      ai_recognized: string[];
+      manually_marked: string[];
+      active: boolean;
+      status: string;
+      elapsed_ms: number;
+    }>(`/teacher/attendance/active-session?course_id=${courseId}`),
+
+  updateActiveSessionStatus: (courseId: string, status: string) =>
+    apiFetch<{ success: boolean }>(`/teacher/attendance/active-session/${courseId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    }),
+
+  startActiveSession: (courseId: string, startTime: number) =>
+    apiFetch<{ success: boolean }>(`/teacher/attendance/active-session/${courseId}/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start_time: startTime }),
+    }),
+
+  clearActiveSession: (courseId: string) =>
+    apiFetch<{ success: boolean }>(`/teacher/attendance/active-session/${courseId}`, {
+      method: "DELETE",
+    }),
+
+  updateManualMark: (courseId: string, studentId: string, isPresent: boolean) =>
+    apiFetch<{
+      success: boolean;
+      course_id: string;
+      student_id: string;
+      is_present: boolean;
+      ai_recognized: string[];
+      manually_marked: string[];
+    }>("/teacher/attendance/active-session/manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        course_id: courseId,
+        student_id: studentId,
+        is_present: isPresent,
+      }),
+    }),
 };
 
 /** Send credentials email */

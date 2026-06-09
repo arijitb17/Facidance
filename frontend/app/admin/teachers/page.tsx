@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Building2, Trash2, Mail, CheckCircle2, Loader2, Users, ChevronDown } from "lucide-react";
-import { useTeachers, useDepartments } from "@/hooks/useAdmin";
+import { UserPlus, Building2, Trash2, Mail, CheckCircle2, Loader2, Users, ChevronDown, BookOpen, X, Pencil } from "lucide-react";
+import { useTeachers, useDepartments, useCourses, useStudents } from "@/hooks/useAdmin";
 import { teachersApi } from "@/lib/api";
 import { useToast } from "@/lib/useToast";
 import { ToastContainer } from "@/components/ToastContainer";
@@ -19,7 +19,7 @@ const CARD_GRAD = "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)";
 const SHADOW = { rest: "0 2px 12px rgba(0,49,53,0.06)", hover: "0 12px 36px rgba(0,49,53,0.12)", active: "0 16px 40px rgba(15,164,175,0.35)" };
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: CARD_GRAD, border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: SHADOW.rest, overflow: "hidden", ...style }}>{children}</div>;
+  return <div style={{ background: CARD_GRAD, border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: SHADOW.rest, overflow: "visible", ...style }}>{children}</div>;
 }
 
 function Btn({ children, onClick, primary, danger, small, disabled }: {
@@ -47,9 +47,12 @@ function SkeletonCard() {
 export default function TeachersPage() {
   const { approved, pending, loading: teachersLoading, refetch } = useTeachers();
   const { data: departments } = useDepartments();
+  const { data: courses } = useCourses();
+  const { students } = useStudents();
   const [activeTeacherId, setActiveTeacherId] = useState<string | null>(null);
   const [activeDeptId, setActiveDeptId] = useState("");
   const [filterDept, setFilterDept] = useState("");
+  const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toasts, toast, removeToast } = useToast();
@@ -71,15 +74,28 @@ export default function TeachersPage() {
   }
 
   async function handleDelete(userId: string) {
-    if (!confirm("Delete this teacher? This cannot be undone.")) return;
+    if (!confirm("Are you sure you want to delete this teacher? This cannot be undone.")) return;
     setActionLoading(true); setError(null);
-    try { 
-      await teachersApi.delete(userId); 
-      toast.success("Teacher Deleted", "Successfully removed teacher record.");
-      refetch(); 
+    try {
+      await teachersApi.delete(userId);
+      toast.success("Teacher Deleted", "Successfully removed teacher account");
+      refetch();
+    } catch (err) {
+      toast.error("Delete Failed", err instanceof Error ? err.message : "Failed to delete teacher");
+    } finally {
+      setActionLoading(false);
     }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed to delete teacher"); }
-    finally { setActionLoading(false); }
+  }
+
+  async function handleEditDept(userId: string, newDeptId: string) {
+    try {
+      await teachersApi.updateDepartment(userId, newDeptId);
+      toast.success("Success", "Teacher department updated successfully.");
+      refetch();
+    } catch (err) {
+      toast.error("Update Failed", err instanceof Error ? err.message : "Failed to update department");
+      throw err;
+    }
   }
 
   return (
@@ -98,6 +114,12 @@ export default function TeachersPage() {
         /* Pending row action buttons: wrap on small screens */
         .pending-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
         @media (max-width: 480px) { .pending-actions { width: 100%; margin-top: 10px; } }
+
+        /* Approved teacher row: stack on mobile */
+        @media (max-width: 540px) {
+          .approved-row { flex-direction: column !important; align-items: flex-start !important; }
+          .approved-row-actions { width: 100% !important; margin-top: 8px !important; }
+        }
       `}</style>
 
       {/* Header */}
@@ -259,43 +281,321 @@ export default function TeachersPage() {
             ) : filteredApproved.length === 0 ? (
               <EmptyState icon={Building2} message={filterDept ? "No approved teachers in this department." : "No approved teachers yet."} />
             ) : filteredApproved.map((t) => (
-              <ApprovedRow key={t.id} teacher={t} onDelete={() => handleDelete(t.userId)} actionLoading={actionLoading} />
+              <ApprovedRow key={t.id} teacher={t} departments={departments ?? []} onClick={() => setSelectedTeacher(t)} onDelete={() => handleDelete(t.userId)} onEditDept={handleEditDept} actionLoading={actionLoading} />
             ))}
           </div>
         </Card>
       </div>
+
+      {selectedTeacher && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: C.white, borderRadius: 20, padding: 30, width: "100%", maxWidth: 500, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", position: "relative" }}>
+            <button onClick={() => setSelectedTeacher(null)} style={{ position: "absolute", top: 16, right: 16, background: "rgba(226,232,240,0.5)", border: "none", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.muted, zIndex: 10 }}>
+              <X size={16} />
+            </button>
+            
+            <div style={{ overflowY: "auto", flex: 1, minHeight: 0, paddingRight: 10, marginRight: -10 }}>
+              <div style={{ alignItems: "center", display: "flex", flexDirection: "column", borderBottom: `1px solid ${C.border}`, paddingBottom: 24, marginBottom: 20, flexShrink: 0, paddingTop: 10 }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.secondary, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{selectedTeacher.name?.charAt(0) || "T"}</span>
+                </div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, margin: 0, textAlign: "center" }}>{selectedTeacher.name}</h2>
+                <span style={{ background: "rgba(15,164,175,0.1)", padding: "4px 14px", borderRadius: 16, marginTop: 8, border: `1px solid ${C.accent}`, fontSize: 11, fontWeight: 700, color: C.secondary }}>Faculty</span>
+              </div>
+
+              <div style={{ marginBottom: 16, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", background: "rgba(248,250,252,0.8)", padding: 14, borderRadius: 12, marginBottom: 8, border: `1px solid ${C.border}` }}>
+                  <Mail size={16} color={C.muted} style={{ marginRight: 14 }} />
+                  <div>
+                    <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 2px" }}>Email</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.text, margin: 0 }}>{selectedTeacher.email}</p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", background: "rgba(248,250,252,0.8)", padding: 14, borderRadius: 12, marginBottom: 8, border: `1px solid ${C.border}` }}>
+                  <Building2 size={16} color={C.muted} style={{ marginRight: 14 }} />
+                  <div>
+                    <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 2px" }}>Department</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.text, margin: 0 }}>{selectedTeacher.departmentName ?? "—"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {(() => {
+                const teacherCourses = courses?.filter(c => c.teacher_id === selectedTeacher.id || c.teacher_name === selectedTeacher.name) || [];
+                const mappedCourses = teacherCourses.map(c => {
+                  const enrolledCount = students?.filter(s => s.courses?.some(sc => sc.id === c.id)).length || 0;
+                  return { ...c, studentsCount: enrolledCount };
+                });
+                const totalStudents = mappedCourses.reduce((sum, c) => sum + c.studentsCount, 0);
+
+                return (
+                  <>
+                    <div style={{ display: "flex", background: "rgba(248,250,252,0.8)", borderRadius: 12, marginBottom: 20, border: `1px solid ${C.border}`, flexShrink: 0 }}>
+                      <div style={{ flex: 1, padding: "16px 0", textAlign: "center" }}>
+                        <p style={{ fontSize: 24, fontWeight: 800, color: C.text, margin: "0 0 4px" }}>{mappedCourses.length}</p>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, margin: 0 }}>Courses</p>
+                      </div>
+                      <div style={{ width: 1, background: C.border }} />
+                      <div style={{ flex: 1, padding: "16px 0", textAlign: "center" }}>
+                        <p style={{ fontSize: 24, fontWeight: 800, color: C.text, margin: "0 0 4px" }}>{totalStudents}</p>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, margin: 0 }}>Students</p>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: 12, fontWeight: 800, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12, flexShrink: 0 }}>Courses Teaching</p>
+                    <div style={{ paddingBottom: 10 }}>
+                      {mappedCourses.length > 0 ? mappedCourses.map(c => (
+                        <div key={c.id} style={{ display: "flex", background: C.white, padding: 14, borderRadius: 12, marginBottom: 8, border: `1px solid ${C.border}` }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(15,164,175,0.1)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 12, flexShrink: 0 }}>
+                            <BookOpen size={16} color={C.secondary} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: C.text, margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</p>
+                            <p style={{ fontSize: 11, fontWeight: 600, color: C.accent, margin: "0 0 8px" }}>{c.code}</p>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(15,164,175,0.1)", color: C.secondary, padding: "3px 8px", borderRadius: 6 }}>{c.program_name ?? "Unknown"}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(16,185,129,0.1)", color: "#059669", padding: "3px 8px", borderRadius: 6 }}>{c.semester_name ?? "Unknown"}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(245,158,11,0.1)", color: "#d97706", padding: "3px 8px", borderRadius: 6 }}>{c.studentsCount} students</span>
+                            </div>
+                          </div>
+                        </div>
+                      )) : (
+                        <p style={{ fontSize: 13, color: C.muted, textAlign: "center", padding: "20px 0" }}>No courses assigned yet.</p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            
+            <div style={{ paddingTop: 20, marginTop: 10, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <button onClick={() => setSelectedTeacher(null)} style={{ width: "100%", padding: "12px 0", borderRadius: 12, background: C.secondary, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }
 
-function ApprovedRow({ teacher, onDelete, actionLoading }: {
-  teacher: { id: string; name: string; email: string; departmentName?: string | null; userId: string };
-  onDelete: () => void; actionLoading: boolean;
+function EditDeptModal({
+  teacher,
+  departments,
+  onClose,
+  onSave,
+  isSaving,
+  initialDeptId,
+}: {
+  teacher: any;
+  departments: { id: string; name: string }[];
+  onClose: () => void;
+  onSave: (deptId: string) => Promise<void>;
+  isSaving: boolean;
+  initialDeptId: string;
 }) {
-  const [hov, setHov] = useState(false);
+  const [deptId, setDeptId] = useState(initialDeptId);
+
   return (
     <div
-      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderRadius: 14, border: `1px solid ${hov ? "rgba(15,164,175,0.22)" : "rgba(226,232,240,0.7)"}`, background: hov ? "#fff" : "rgba(248,250,252,0.8)", transition: "all 0.2s ease", boxShadow: hov ? "0 6px 20px rgba(0,49,53,0.08)" : "none" }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.5)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-        <div style={{ height: 40, width: 40, minWidth: 40, borderRadius: "50%", background: ICON_GRAD, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Users size={16} color="#fff" />
+      <div
+        style={{
+          background: C.white,
+          borderRadius: 20,
+          padding: 30,
+          width: "100%",
+          maxWidth: 460,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            background: "rgba(226,232,240,0.5)",
+            border: "none",
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: C.muted,
+          }}
+        >
+          <X size={16} />
+        </button>
+
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.text }}>
+          Edit department for <span style={{ color: C.primary }}>{teacher.name}</span>
+        </h2>
+
+        <div style={{ marginTop: 24 }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              color: C.muted,
+            }}
+          >
+            Department
+          </label>
+          <select
+            value={deptId}
+            onChange={(e) => setDeptId(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              background: "#fff",
+              fontSize: 13,
+              color: C.text,
+            }}
+          >
+            <option value="">Select department...</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
         </div>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: 13.5, fontWeight: 700, color: "#003135", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teacher.name}</p>
-          <p style={{ fontSize: 12, color: "#475569", margin: "2px 0 0", display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}><Mail size={11} /> {teacher.email}</p>
-          <p style={{ fontSize: 11, color: "#475569", margin: "2px 0 0" }}>
-            Dept: <span style={{ fontWeight: 700, color: "#003135" }}>{teacher.departmentName ?? "—"}</span>
-          </p>
+
+        <div
+          style={{
+            marginTop: 30,
+            display: "flex",
+            gap: 12,
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            onClick={onClose}
+            disabled={isSaving}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              background: "#e2e8f0",
+              color: "#475569",
+              border: "none",
+              fontSize: 13,
+              cursor: isSaving ? "not-allowed" : "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(deptId)}
+            disabled={isSaving || !deptId}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              background: isSaving || !deptId ? "#cbd5e1" : "#0FA4AF",
+              color: "#fff",
+              border: "none",
+              fontSize: 13,
+              cursor: isSaving || !deptId ? "not-allowed" : "pointer",
+            }}
+          >
+            {isSaving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Save"}
+          </button>
         </div>
       </div>
-      <button onClick={onDelete} disabled={actionLoading}
-        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 13px", borderRadius: 9, border: "1px solid #fecdd3", background: hov ? "#fff1f2" : "transparent", color: "#e11d48", fontSize: 12, fontWeight: 600, cursor: actionLoading ? "not-allowed" : "pointer", transition: "all 0.2s ease", flexShrink: 0, whiteSpace: "nowrap" }}>
-        <Trash2 size={12} /> Delete
-      </button>
     </div>
+  );
+}
+
+function ApprovedRow({ teacher, departments, onClick, onDelete, onEditDept, actionLoading }: {
+  teacher: { id: string; name: string; email: string; departmentName?: string | null; department_id?: string | null; departmentId?: string | null; userId: string };
+  departments: { id: string; name: string }[];
+  onClick: () => void; onDelete: () => void; onEditDept: (userId: string, newDeptId: string) => Promise<void>; actionLoading: boolean;
+}) {
+  const [hov, setHov] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const startEdit = () => setIsEditing(true);
+  const closeEdit = () => setIsEditing(false);
+
+  const handleSave = async (deptId: string) => {
+    setIsSaving(true);
+    try {
+      await onEditDept(teacher.userId, deptId);
+      closeEdit();
+    } catch (e) {
+      // handled by parent toast
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div
+        onClick={!isEditing ? onClick : undefined}
+        onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+        className="approved-row"
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderRadius: 14, border: `1px solid ${hov ? "rgba(15,164,175,0.22)" : "rgba(226,232,240,0.7)"}`, background: hov ? "#fff" : "rgba(248,250,252,0.8)", transition: "all 0.2s ease", boxShadow: hov ? "0 6px 20px rgba(0,49,53,0.08)" : "none", cursor: isEditing ? "default" : "pointer", flexWrap: "wrap" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+          <div style={{ height: 40, width: 40, minWidth: 40, borderRadius: "50%", background: ICON_GRAD, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users size={16} color="#fff" />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: 13.5, fontWeight: 700, color: "#003135", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teacher.name}</p>
+            <p style={{ fontSize: 12, color: "#475569", margin: "2px 0 0", display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}><Mail size={11} /> {teacher.email}</p>
+            <p style={{ fontSize: 11, color: "#475569", margin: "2px 0 0" }}>
+              Dept: <span style={{ fontWeight: 700, color: "#003135" }}>{teacher.departmentName ?? "—"}</span>
+            </p>
+          </div>
+        </div>
+        
+        {!isEditing && (
+          <div className="approved-row-actions" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button onClick={(e) => { e.stopPropagation(); startEdit(); }} disabled={actionLoading}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 13px", borderRadius: 9, border: "1px solid #cbd5e1", background: hov ? "#fff" : "transparent", color: "#475569", fontSize: 12, fontWeight: 600, cursor: actionLoading ? "not-allowed" : "pointer", transition: "all 0.2s ease", flexShrink: 0, whiteSpace: "nowrap" }}>
+              <Pencil size={12} /> Edit
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={actionLoading}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 13px", borderRadius: 9, border: "1px solid #fecdd3", background: hov ? "#fff1f2" : "transparent", color: "#e11d48", fontSize: 12, fontWeight: 600, cursor: actionLoading ? "not-allowed" : "pointer", transition: "all 0.2s ease", flexShrink: 0, whiteSpace: "nowrap" }}>
+              <Trash2 size={12} /> Delete
+            </button>
+          </div>
+        )}
+      </div>
+
+      {isEditing && (
+        <EditDeptModal
+          teacher={teacher}
+          departments={departments}
+          onClose={closeEdit}
+          onSave={handleSave}
+          isSaving={isSaving}
+          initialDeptId={teacher.department_id || teacher.departmentId || ""}
+        />
+      )}
+    </>
   );
 }
 

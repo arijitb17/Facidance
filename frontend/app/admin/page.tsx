@@ -209,22 +209,22 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading, onClick }: {
       style={{
         background: CARD_GRAD,
         border: `1px solid ${hov ? C.borderHov : C.border}`,
-        borderRadius: 18, padding: "22px 24px",
+        borderRadius: 18, padding: "18px 16px",
         boxShadow: hov ? SHADOW.hover : SHADOW.rest,
         transform: hov ? "translateY(-5px) scale(1.01)" : "translateY(0) scale(1)",
         transition: EASE_ALL, overflow: "hidden",
         cursor: onClick ? "pointer" : "default",
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {title}
           </p>
           {loading
             ? <SkeletonLine w={80} h={36} />
             : (
-              <p style={{ fontSize: 34, fontWeight: 800, color: C.text, lineHeight: 1, marginTop: 10, letterSpacing: "-0.03em" }}>
+              <p style={{ fontSize: 28, fontWeight: 800, color: C.text, lineHeight: 1, marginTop: 10, letterSpacing: "-0.03em" }}>
                 {typeof value === "number" ? value.toLocaleString() : value}
               </p>
             )
@@ -242,9 +242,9 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading, onClick }: {
   <span style={{
     fontSize: 11, fontWeight: 700,
     color: trend === "up" ? "#10b981" : trend === "down" ? "#f97316" : C.muted,
-    whiteSpace: "nowrap",      // ← prevent wrap
     overflow: "hidden",
-    textOverflow: "ellipsis",  // ← clip if too long
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   }}>
     {trendLabel}
   </span>
@@ -255,14 +255,14 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading, onClick }: {
         </div>
         {/* Same teal icon box as teacher dashboard */}
         <div style={{
-          height: 50, width: 50, borderRadius: 14, flexShrink: 0,
+          height: 42, width: 42, borderRadius: 12, flexShrink: 0,
           background: ICON_GRAD,
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: hov ? "0 8px 24px rgba(15,164,175,0.38)" : "0 6px 20px rgba(15,164,175,0.28)",
           transform: hov ? "scale(1.1) rotate(-3deg)" : "scale(1) rotate(0deg)",
           transition: EASE_ALL,
         }}>
-          <Icon size={22} color="#fff" strokeWidth={2} />
+          <Icon size={18} color="#fff" strokeWidth={2} />
         </div>
       </div>
     </div>
@@ -484,7 +484,7 @@ export default function AdminDashboard() {
 >
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>
-            Admin Dashboard 🛡️
+            Admin Dashboard
           </h1>
           <p style={{ fontSize: 14, color: C.body, marginTop: 6, lineHeight: 1.5 }}>
             Institution-wide overview — teachers, students, departments &amp; analytics.
@@ -808,12 +808,12 @@ export default function AdminDashboard() {
           .qa-grid     { grid-template-columns: repeat(3, 1fr) !important; }
         }
         @media (max-width: 640px) {
-          .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
           .qa-grid   { grid-template-columns: repeat(2, 1fr) !important; }
         }
         @media (max-width: 400px) {
-          .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .qa-grid   { grid-template-columns: repeat(2, 1fr) !important; }
+          .stat-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+          .qa-grid   { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

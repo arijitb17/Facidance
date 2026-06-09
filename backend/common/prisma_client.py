@@ -275,7 +275,13 @@ class Database:
 
     async def connect(self):
         if not self.pool:
-            self.pool = await asyncpg.create_pool(DATABASE_URL)
+            self.pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                min_size=5,
+                max_size=20,
+                max_inactive_connection_lifetime=300,
+                statement_cache_size=100,
+            )
             print("✅ DB connected")
 
     async def disconnect(self):

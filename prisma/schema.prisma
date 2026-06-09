@@ -84,8 +84,8 @@ model Course {
   name       String
   code       String      @unique
   entryCode  String      @unique
-  teacher    Teacher     @relation(fields: [teacherId], references: [id])
-  teacherId  String
+  teacher    Teacher?    @relation(fields: [teacherId], references: [id])
+  teacherId  String?
   semester   Semester    @relation(fields: [semesterId], references: [id])
   semesterId String
   students   Student[]   @relation("CourseStudents")

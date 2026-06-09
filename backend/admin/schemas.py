@@ -29,6 +29,10 @@ class CreateTeacherRequest(BaseModel):
     department_id: str
 
 
+class UpdateTeacherDepartmentRequest(BaseModel):
+    department_id: str
+
+
 class TeacherResponse(BaseModel):
     id: str
     user_id: str
@@ -82,6 +86,10 @@ class ProgramResponse(BaseModel):
     name: str
     department_id: str
     department_name: Optional[str] = None
+
+
+class UpdateProgramRequest(BaseModel):
+    department_id: str
 
 
 # ---------------------------------------------------------------------------

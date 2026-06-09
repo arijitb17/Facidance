@@ -12,10 +12,7 @@ Endpoints mirror the Next.js teacher API routes:
   GET  /teacher/courses/{course_id}/students
   DELETE /teacher/courses/{course_id}/students
   POST /teacher/courses/{course_id}/import
-  POST /teacher/courses/{course_id}/enroll-existing
   GET  /teacher/students
-  GET  /teacher/students/search
-  GET  /teacher/students/at-risk
   GET  /teacher/reports
   GET  /teacher/attendance/history
   POST /teacher/attendance/get-students
@@ -23,13 +20,12 @@ Endpoints mirror the Next.js teacher API routes:
   POST /teacher/attendance/run-training
   POST /teacher/attendance/recognize
   POST /teacher/attendance/submit
-  PATCH /teacher/attendance/mark-present
   POST /teacher/send-credentials
 """
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Path, Query, UploadFile
 
 from backend.teacher.dependencies import get_current_teacher
 from backend.teacher import service
@@ -42,8 +38,10 @@ from backend.teacher.schemas import (
     SendCredentialsRequest,
     SubmitAttendanceRequest,
     EnrollExistingRequest,
+    UpdateManualMarkRequest,
+    SessionStatusUpdate,
+    SessionStartRequest,
 )
-from backend.common.metrics import TEACHER_UNHANDLED_ERRORS_TOTAL
 
 router = APIRouter(prefix="/teacher", tags=["Teacher"])
 
@@ -56,24 +54,12 @@ TeacherUser = Annotated[dict, Depends(get_current_teacher)]
 
 @router.get("/me", summary="Get teacher profile (name, department, courses)")
 async def me(teacher: TeacherUser):
-    try:
-        return await service.get_me(teacher["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/me").inc()
-        raise
+    return await service.get_me(teacher["id"])
 
 
 @router.get("/stats", summary="Dashboard counts for the logged-in teacher")
 async def stats(teacher: TeacherUser):
-    try:
-        return await service.get_stats(teacher["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/stats").inc()
-        raise
+    return await service.get_stats(teacher["id"])
 
 
 # ---------------------------------------------------------------------------
@@ -82,13 +68,7 @@ async def stats(teacher: TeacherUser):
 
 @router.get("/hierarchy", summary="Full course hierarchy for this teacher")
 async def hierarchy(teacher: TeacherUser):
-    try:
-        return await service.get_hierarchy(teacher["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/hierarchy").inc()
-        raise
+    return await service.get_hierarchy(teacher["id"])
 
 
 # ---------------------------------------------------------------------------
@@ -97,16 +77,13 @@ async def hierarchy(teacher: TeacherUser):
 
 @router.get("/courses", summary="List teacher's courses with student & session counts")
 async def list_courses(teacher: TeacherUser):
-    try:
-        courses = await service.get_courses(teacher["id"])
-        return {"courses": courses}
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/courses").inc()
-        raise
+    courses = await service.get_courses(teacher["id"])
+    return {"courses": courses}
 
-
+# Add to router.py
+@router.get("/students/at-risk", summary="Students below 75% attendance across all courses")
+async def at_risk_students(teacher: TeacherUser):
+    return await service.get_at_risk_students(teacher["id"])
 # ---------------------------------------------------------------------------
 # Course students sub-resource
 # ---------------------------------------------------------------------------
@@ -119,13 +96,8 @@ async def get_course_students(
     course_id: Annotated[str, Path()],
     teacher: TeacherUser,
 ):
-    try:
-        return await service.get_course_students(teacher["id"], course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/courses/{course_id}/students").inc()
-        raise
+    return await service.get_course_students(teacher["id"], course_id)
+
 
 
 @router.delete(
@@ -137,13 +109,7 @@ async def remove_student(
     body: RemoveStudentRequest,
     teacher: TeacherUser,
 ):
-    try:
-        return await service.remove_student_from_course(teacher["id"], course_id, body)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/courses/{course_id}/students").inc()
-        raise
+    return await service.remove_student_from_course(teacher["id"], course_id, body)
 
 
 @router.post(
@@ -155,13 +121,7 @@ async def import_students(
     body: ImportStudentsRequest,
     teacher: TeacherUser,
 ):
-    try:
-        return await service.import_students(course_id, teacher["id"], body)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/courses/{course_id}/import").inc()
-        raise
+    return await service.import_students(course_id, teacher["id"], body)
 
 
 @router.post(
@@ -173,30 +133,19 @@ async def enroll_existing(
     body: EnrollExistingRequest,
     teacher: TeacherUser,
 ):
-    try:
-        return await service.enroll_existing_student(course_id, teacher["id"], body.student_id)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/courses/{course_id}/enroll-existing").inc()
-        raise
+    return await service.enroll_existing_student(course_id, teacher["id"], body.student_id)
 
 
 # ---------------------------------------------------------------------------
 # Students (teacher-scoped)
-# NOTE: specific sub-paths (/at-risk, /search) must be declared BEFORE
-# any parameterised route like /{student_id} to avoid routing conflicts.
 # ---------------------------------------------------------------------------
 
-@router.get("/students/at-risk", summary="Students below 75% attendance across all courses")
-async def at_risk_students(teacher: TeacherUser):
-    try:
-        return await service.get_at_risk_students(teacher["id"])
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/students/at-risk").inc()
-        raise
+@router.get("/students", summary="All students across teacher's courses (optionally filtered by course)")
+async def list_students(
+    teacher: TeacherUser,
+    course_id: Optional[str] = Query(None, description="Filter to a single course"),
+):
+    return await service.get_teacher_students(teacher["id"], course_id)
 
 
 @router.get("/students/search", summary="Search all registered students (excludes those already in the course)")
@@ -205,27 +154,7 @@ async def search_students(
     q: str = Query("", description="Search query for name or email"),
     course_id: Optional[str] = Query(None, description="Course ID to exclude already enrolled students"),
 ):
-    try:
-        return await service.search_students(teacher["id"], q, course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/students/search").inc()
-        raise
-
-
-@router.get("/students", summary="All students across teacher's courses (optionally filtered by course)")
-async def list_students(
-    teacher: TeacherUser,
-    course_id: Optional[str] = Query(None, description="Filter to a single course"),
-):
-    try:
-        return await service.get_teacher_students(teacher["id"], course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/students").inc()
-        raise
+    return await service.search_students(teacher["id"], q, course_id)
 
 
 # ---------------------------------------------------------------------------
@@ -239,13 +168,7 @@ async def get_report(
     start_date: Optional[str] = Query(None, description="ISO date string"),
     end_date: Optional[str] = Query(None, description="ISO date string"),
 ):
-    try:
-        return await service.get_report(teacher["id"], course_id, start_date, end_date)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/reports").inc()
-        raise
+    return await service.get_report(teacher["id"], course_id, start_date, end_date)
 
 
 # ---------------------------------------------------------------------------
@@ -254,13 +177,7 @@ async def get_report(
 
 @router.post("/attendance/get-students", summary="List students in a course for attendance marking")
 async def attendance_get_students(body: GetStudentsRequest, teacher: TeacherUser):
-    try:
-        return await service.get_course_students_for_attendance(teacher["id"], body)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/get-students").inc()
-        raise
+    return await service.get_course_students_for_attendance(teacher["id"], body)
 
 
 @router.post(
@@ -273,31 +190,21 @@ async def train_student(
     course_id: str = Form(...),
     photos: list[UploadFile] = File(..., description="front, left, right photos"),
 ):
-    try:
-        from backend.common.prisma_client import prisma as _prisma
+    # Resolve teacher record id
+    from backend.common.prisma_client import prisma as _prisma
 
-        t = await _prisma.teacher.find_unique(where={"userId": teacher["id"]})
-        if not t:
-            raise HTTPException(status_code=404, detail="Teacher not found")
+    t = await _prisma.teacher.find_unique(where={"userId": teacher["id"]})
+    if not t:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Teacher not found")
 
-        photos_bytes = [(await p.read(), p.filename or "photo.jpg") for p in photos]
-        return await service.train_student(teacher["id"], t.id, student_id, course_id, photos_bytes)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/train-student").inc()
-        raise
+    photos_bytes = [(await p.read(), p.filename or "photo.jpg") for p in photos]
+    return await service.train_student(teacher["id"], t.id, student_id, course_id, photos_bytes)
 
 
 @router.post("/attendance/run-training", summary="Trigger model training on Python face service")
 async def run_training(body: RunTrainingRequest, _: TeacherUser):
-    try:
-        return await service.run_training(body)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/run-training").inc()
-        raise
+    return await service.run_training(body)
 
 
 @router.post(
@@ -311,36 +218,57 @@ async def recognize_faces(
     auto_submit: bool = Form(False),
     frames: list[UploadFile] = File(...),
 ):
-    try:
-        frames_bytes = [(await f.read(), f.filename or "frame.jpg") for f in frames]
-        return await service.recognize_faces(course_id, batch_id, frames_bytes, auto_submit)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/recognize").inc()
-        raise
+    frames_bytes = [(await f.read(), f.filename or "frame.jpg") for f in frames]
+    return await service.recognize_faces(course_id, batch_id, frames_bytes, auto_submit)
 
 
 @router.post("/attendance/submit", summary="Persist attendance records from recognition results")
 async def submit_attendance(body: SubmitAttendanceRequest, _: TeacherUser):
-    try:
-        return await service.submit_attendance(body)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/submit").inc()
-        raise
+    return await service.submit_attendance(body)
 
 
 @router.patch("/attendance/mark-present", summary="Manually mark a student as present")
 async def mark_present(body: MarkPresentRequest, _: TeacherUser):
-    try:
-        return await service.mark_present(body.course_id, body.student_id, body.date)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/mark-present").inc()
-        raise
+    return await service.mark_present(body.course_id, body.student_id, body.date)
+
+
+@router.get("/attendance/active-session", summary="Get active session state for live sync")
+async def get_active_session(
+    _: TeacherUser,
+    course_id: str = Query(...),
+):
+    return service.get_active_session(course_id)
+
+
+@router.post("/attendance/active-session/manual", summary="Toggle manual mark in active session")
+async def update_manual_mark(body: UpdateManualMarkRequest, _: TeacherUser):
+    return service.update_manual_mark(body.course_id, body.student_id, body.is_present)
+
+
+@router.patch("/attendance/active-session/{course_id}/status", summary="Update active session status")
+async def update_active_session_status(
+    course_id: str,
+    data: SessionStatusUpdate,
+    _: TeacherUser,
+):
+    return service.update_session_status(course_id, data.status)
+
+@router.post("/attendance/active-session/{course_id}/start", summary="Start active session with absolute time")
+async def start_active_session(
+    course_id: str,
+    data: SessionStartRequest,
+    _: TeacherUser,
+):
+    return service.start_session(course_id, data.start_time)
+
+@router.delete("/attendance/active-session/{course_id}", summary="Clear active session (end session)")
+async def clear_active_session(
+    course_id: str,
+    _: TeacherUser,
+):
+    service.clear_active_session(course_id)
+    return {"success": True}
+
 
 
 @router.get("/attendance/history", summary="Attendance history for a course grouped by date")
@@ -348,13 +276,7 @@ async def attendance_history(
     _: TeacherUser,
     course_id: str = Query(...),
 ):
-    try:
-        return await service.get_attendance_history(course_id)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/attendance/history").inc()
-        raise
+    return await service.get_attendance_history(course_id)
 
 
 # ---------------------------------------------------------------------------
@@ -363,10 +285,4 @@ async def attendance_history(
 
 @router.post("/send-credentials", summary="Email login credentials to newly imported students")
 async def send_credentials(body: SendCredentialsRequest, _: TeacherUser):
-    try:
-        return await service.send_credentials(body)
-    except HTTPException:
-        raise
-    except Exception:
-        TEACHER_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/teacher/send-credentials").inc()
-        raise
+    return await service.send_credentials(body)

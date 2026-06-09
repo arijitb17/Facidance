@@ -41,7 +41,7 @@ const CARD_GRAD = "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)";
 
 const SESSION_DURATION = 45 * 60 * 1000;
 const CAPTURE_INTERVAL = 2  * 60 * 1000;
-const BASE_SCALE = 1.3; // Always render video 30% larger so pan/tilt work without zooming
+const BASE_SCALE = 1.0; // Render video at normal scale initially
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Student { id: string; name: string; email: string; hasFaceData: boolean }
@@ -130,6 +130,7 @@ export default function AttendanceCapturePage() {
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const livePollingRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadRef = useRef(false);
 
   const [courseId, setCourseId] = useState("");
@@ -164,6 +165,7 @@ export default function AttendanceCapturePage() {
   const [submitting, setSubmitting] = useState(false);
   const [showSessionSummary, setShowSessionSummary] = useState(false);
   const [manuallyMarked, setManuallyMarked] = useState<Set<string>>(new Set());
+  const [markingId, setMarkingId] = useState<string | null>(null);
   const [lastSubmitDate, setLastSubmitDate] = useState<string | null>(null);
   const [summarySubmitted, setSummarySubmitted] = useState(false);
 
@@ -202,7 +204,43 @@ export default function AttendanceCapturePage() {
     if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    if (livePollingRef.current) clearInterval(livePollingRef.current);
   }
+
+  // ─── Live session sync: poll backend every 3s for manual marks from mobile ───
+  useEffect(() => {
+    if (sessionActive && !sessionPaused && courseId) {
+      async function pollActiveSession() {
+        try {
+          const data = await teacherAttendanceApi.getActiveSession(courseId);
+          if (data && data.active !== false) {
+            // Merge manual marks from mobile app
+            if (data.manually_marked) {
+              setManuallyMarked((prev) => {
+                const next = new Set(prev);
+                data.manually_marked.forEach((id: string) => next.add(id));
+                // Remove any that were unmarked from mobile
+                prev.forEach((id) => {
+                  if (!data.manually_marked.includes(id)) next.delete(id);
+                });
+                return next;
+              });
+            }
+          }
+        } catch (e) {
+          // Silent fail on polling errors
+        }
+      }
+      pollActiveSession();
+      livePollingRef.current = setInterval(pollActiveSession, 3000);
+      return () => {
+        if (livePollingRef.current) { clearInterval(livePollingRef.current); livePollingRef.current = null; }
+      };
+    } else {
+      if (livePollingRef.current) { clearInterval(livePollingRef.current); livePollingRef.current = null; }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionActive, sessionPaused, courseId]);
 
   async function fetchStudents(cid: string) {
     try {
@@ -219,7 +257,7 @@ export default function AttendanceCapturePage() {
   }
 
   async function startCamera() {
-    const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false });
+    const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: "user" }, audio: false });
     if (videoRef.current) { videoRef.current.srcObject = mediaStream; setStream(mediaStream); setCameraActive(true); }
   }
 
@@ -278,28 +316,50 @@ export default function AttendanceCapturePage() {
 
   function normalizeResult(result: Record<string, unknown>): RecognitionResult {
     const rawRec = (result.recognizedStudents as unknown[]) || [];
-    const normalized: RecognitionStudent[] = rawRec.map((item) => {
-      if (!item) return { id: "unknown", name: "unknown", email: "" };
+    const validStudents: RecognitionStudent[] = [];
+
+    for (const item of rawRec) {
+      if (!item) continue;
+      
+      let found: Student | undefined;
+      
       if (typeof item === "string") {
-        const found = students.find((s) => s.id === item || s.name.toLowerCase() === item.toLowerCase());
-        return found ? { id: found.id, name: found.name, email: found.email } : { id: item, name: item, email: "" };
+        found = students.find((s) => s.id === item || s.name.toLowerCase() === item.toLowerCase());
+      } else {
+        const obj = item as Record<string, unknown>;
+        for (const cand of [obj.id, obj.studentId, obj.name].filter(Boolean)) {
+          found = students.find((s) => s.id === String(cand) || s.name.toLowerCase() === String(cand).toLowerCase());
+          if (found) break;
+        }
       }
-      const obj = item as Record<string, unknown>;
-      for (const cand of [obj.id, obj.studentId, obj.name].filter(Boolean)) {
-        const found = students.find((s) => s.id === String(cand) || s.name.toLowerCase() === String(cand).toLowerCase());
-        if (found) return { id: found.id, name: found.name, email: found.email };
+
+      // Only include students who are actually enrolled in this course
+      if (found) {
+        // Prevent duplicate entries in the same batch
+        if (!validStudents.some(s => s.id === found!.id)) {
+          validStudents.push({ id: found.id, name: found.name, email: found.email });
+        }
       }
-      return { id: String(obj.id ?? ""), name: String(obj.name ?? obj.id ?? ""), email: String(obj.email ?? "") };
-    });
-    return { totalFaces: Number(result.totalFaces ?? normalized.length), recognizedStudents: normalized, averageConfidence: typeof result.averageConfidence === "number" ? result.averageConfidence : 0, detections: [] };
+    }
+
+    return { 
+      totalFaces: Number(result.totalFaces ?? validStudents.length), 
+      recognizedStudents: validStudents, 
+      averageConfidence: typeof result.averageConfidence === "number" ? result.averageConfidence : 0, 
+      detections: [] 
+    };
   }
 
   async function startSession() {
     if (students.filter((s) => s.hasFaceData).length === 0) { toast.error("No trained students", "Please train the model first"); return; }
     try {
       await startCamera();
+      const startTime = Date.now();
+      if (courseId) {
+        teacherAttendanceApi.startActiveSession(courseId, startTime).catch(() => {});
+      }
       setSessionActive(true); setSessionPaused(false);
-      setSessionStartTime(Date.now()); setTimeRemaining(SESSION_DURATION);
+      setSessionStartTime(startTime); setTimeRemaining(SESSION_DURATION);
       setSessionRecognitions([]); setAllRecognizedStudents(new Set()); setCurrentRecognition(null);
       toast.success("Session started", "45-minute attendance session active");
       await new Promise((r) => setTimeout(r, 1000));
@@ -323,6 +383,10 @@ export default function AttendanceCapturePage() {
 
   function endSession() {
     cleanup(); setSessionActive(false); setSessionPaused(false);
+    if (courseId) {
+      // Clear the active session on the backend so the mobile app sees active:false immediately
+      teacherAttendanceApi.clearActiveSession(courseId).catch(() => {});
+    }
     
     const allPresentCount = allRecognizedStudents.size + manuallyMarked.size;
     
@@ -333,6 +397,14 @@ export default function AttendanceCapturePage() {
     }
     else toast.warning("Session ended", "No students were marked present.");
   }
+
+  function showSummaryForSubmit() {
+    if (allRecognizedStudents.size === 0 || !courseId) { toast.error("Cannot submit", "No students recognized"); return; }
+    setShowSessionSummary(true);
+    setSummarySubmitted(false);
+    setManuallyMarked(new Set());
+  }
+
   async function submitFinalAttendance() {
     if (!courseId) return;
     const allPresentIds = new Set(allRecognizedStudents);
@@ -362,6 +434,8 @@ export default function AttendanceCapturePage() {
 
   function handleMarkPresent(studentId: string) {
     setManuallyMarked((prev) => new Set(prev).add(studentId));
+    // Sync to backend so the mobile app sees this mark
+    if (courseId) teacherAttendanceApi.updateManualMark(courseId, studentId, true).catch(() => {});
   }
 
   function handleUnmarkPresent(studentId: string) {
@@ -370,6 +444,8 @@ export default function AttendanceCapturePage() {
       next.delete(studentId);
       return next;
     });
+    // Sync to backend so the mobile app sees this unmark
+    if (courseId) teacherAttendanceApi.updateManualMark(courseId, studentId, false).catch(() => {});
   }
 
   function dismissSummary() {
@@ -495,6 +571,14 @@ export default function AttendanceCapturePage() {
                   <MiniStat label="Scans"    value={sessionRecognitions.length} color={C.body} />
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
+                  <ActionBtn 
+                    variant="primary" 
+                    onClick={captureAndRecognize}
+                    disabled={capturing || sessionPaused}
+                  >
+                    {capturing ? <Zap size={14} className="animate-pulse" /> : <Camera size={14} />} 
+                    {capturing ? "Wait…" : "Capture Now"}
+                  </ActionBtn>
                   {!sessionPaused ? (
                     <ActionBtn variant="pause" onClick={pauseSession}><Pause size={14} /> Pause</ActionBtn>
                   ) : (
@@ -519,22 +603,79 @@ export default function AttendanceCapturePage() {
         )}
 
         {/* Pre-session stats */}
+        {/* Pre-session stats */}
         {!sessionActive && !showHistory && (
-          <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(3, 1fr)" }} className="stat-grid">
-            {[
-              { label: "Total Students",   value: students.length,  color: C.text },
-              { label: "Trained Students", value: trainedCount,     color: C.accent },
-              { label: "Not Trained",      value: untrainedCount,   color: untrainedCount > 0 ? "#dc2626" : C.text },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{
-                background: CARD_GRAD, border: `1px solid ${C.border}`,
-                borderRadius: 18, padding: "22px 24px", boxShadow: SHADOW.rest,
-              }}>
-                <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</p>
-                <p style={{ fontSize: 34, fontWeight: 800, color, letterSpacing: "-0.03em", lineHeight: 1, marginTop: 10 }}>{value}</p>
-              </div>
-            ))}
-          </div>
+          <>
+            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(3, 1fr)" }} className="stat-grid">
+              {[
+                { label: "Total Students",   value: students.length,  color: C.text },
+                { label: "Trained Students", value: trainedCount,     color: C.accent },
+                { label: "Not Trained",      value: untrainedCount,   color: untrainedCount > 0 ? "#dc2626" : C.text },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{
+                  background: CARD_GRAD, border: `1px solid ${C.border}`,
+                  borderRadius: 18, padding: "22px 24px", boxShadow: SHADOW.rest,
+                }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</p>
+                  <p style={{ fontSize: 34, fontWeight: 800, color, letterSpacing: "-0.03em", lineHeight: 1, marginTop: 10 }}>{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Attendance Already Recorded Banner */}
+            {(() => {
+              const today = new Date();
+              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+              const todaysAttendance = attendanceHistory[todayStr];
+              
+              if (!todaysAttendance || todaysAttendance.length === 0) return null;
+              
+              const present = todaysAttendance.filter((r) => r.status);
+              const absentCount = todaysAttendance.length - present.length;
+              const rate = ((present.length / todaysAttendance.length) * 100).toFixed(1);
+              
+              return (
+                <div style={{
+                  background: C.white, border: `2px solid rgba(15,164,175,0.25)`,
+                  borderRadius: 20, padding: "24px", boxShadow: "0 8px 30px rgba(15,164,175,0.08)",
+                  position: "relative", overflow: "hidden"
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                    <CheckCircle2 size={20} color={C.accent} style={{ marginTop: 2 }} />
+                    <div>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>Attendance Already Recorded Today</p>
+                      <p style={{ fontSize: 13, color: C.body, marginTop: 4 }}>Submitted via website or another device</p>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, padding: "0 10px" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ fontSize: 26, fontWeight: 800, color: "#059669", lineHeight: 1 }}>{present.length}</p>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginTop: 6 }}>Present</p>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ fontSize: 26, fontWeight: 800, color: "#dc2626", lineHeight: 1 }}>{absentCount}</p>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginTop: 6 }}>Absent</p>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ fontSize: 26, fontWeight: 800, color: C.accent, lineHeight: 1 }}>{rate}%</p>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginTop: 6 }}>Rate</p>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    marginTop: 24, padding: "14px 16px", borderRadius: 12,
+                    background: "#f8fafc", border: `1px solid ${C.border}`,
+                  }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: C.textSoft, marginBottom: 4 }}>Present students:</p>
+                    <p style={{ fontSize: 13, color: C.body, lineHeight: 1.5 }}>
+                      {present.length > 0 ? present.map(p => p.studentName).join(", ") : "None"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
         )}
 
         {/* History panel */}
@@ -565,7 +706,7 @@ export default function AttendanceCapturePage() {
 
         {/* Main session area */}
         {!showHistory && (
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 20 }} className="session-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,3fr) minmax(0,2fr)", gap: 20 }} className="session-grid">
 
             {/* Camera */}
             <Card>
@@ -573,11 +714,11 @@ export default function AttendanceCapturePage() {
               <div style={{ padding: "16px 26px 26px" }}>
                 <div style={{
   position: "relative", borderRadius: 14, overflow: "hidden",
-  background: "#0a0a0a", aspectRatio: "16/9",
+  background: "#0a0a0a", aspectRatio: "4/3",
   boxShadow: cameraActive ? "0 0 0 3px rgba(15,164,175,0.3)" : "none",
   transition: EASE_ALL,
 }}>
-  <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: `scale(${BASE_SCALE * zoom})`, transformOrigin: `${50 + (pan / 2)}% ${50 + (tilt / 2)}%`, transition: "all 0.15s ease-out" }} />
+  <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: `scale(${BASE_SCALE * zoom}) translate(${-pan * 0.15}%, ${-tilt * 0.15}%)`, transition: "all 0.15s ease-out" }} />
   <canvas ref={canvasRef} style={{ display: "none" }} />
 
   {/* Pre-session overlay */}
@@ -588,38 +729,75 @@ export default function AttendanceCapturePage() {
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       gap: 16, padding: 24,
     }}>
-      <div style={{
-        height: 56, width: 56, borderRadius: 16,
-        background: "rgba(255,255,255,0.1)",
-        border: "1px solid rgba(255,255,255,0.15)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <Camera size={24} color="#fff" />
-      </div>
-      <div style={{ textAlign: "center" }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
-          Ready to capture attendance
-        </p>
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 6, lineHeight: 1.6, maxWidth: 280 }}>
-          45-minute session · auto-capture every 2 min · cumulative recognition
-        </p>
-      </div>
-      <button
-        onClick={startSession}
-        disabled={trainedCount === 0}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          padding: "12px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-          background: trainedCount === 0 ? "rgba(255,255,255,0.1)" : ICON_GRAD,
-          color: "#fff", border: "none", cursor: trainedCount === 0 ? "not-allowed" : "pointer",
-          boxShadow: trainedCount > 0 ? "0 8px 24px rgba(15,164,175,0.4)" : "none",
-          opacity: trainedCount === 0 ? 0.5 : 1,
-        }}
-      >
-        <Play size={17} /> Start 45-Min Session
-      </button>
-      {trainedCount === 0 && (
-        <p style={{ fontSize: 11.5, color: "rgba(255,100,100,0.9)" }}>⚠️ No trained students. Train the model first.</p>
+      {recognizedCount > 0 ? (
+        /* Session just ended — show "Session Complete" instead of "Start again" */
+        <>
+          <div style={{
+            height: 56, width: 56, borderRadius: 16,
+            background: "rgba(16,185,129,0.2)",
+            border: "1px solid rgba(16,185,129,0.35)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <CheckCircle2 size={24} color="#10b981" />
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
+              Session Complete
+            </p>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 6, lineHeight: 1.6, maxWidth: 280 }}>
+              {recognizedCount} student{recognizedCount !== 1 ? "s" : ""} recognized · Review and submit attendance on the right panel
+            </p>
+          </div>
+          <button
+            onClick={startSession}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 20px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+              background: "rgba(255,255,255,0.1)",
+              color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.15)",
+              cursor: "pointer", marginTop: 4,
+            }}
+          >
+            <Play size={15} /> Start New Session
+          </button>
+        </>
+      ) : (
+        /* No results yet — normal start screen */
+        <>
+          <div style={{
+            height: 56, width: 56, borderRadius: 16,
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Camera size={24} color="#fff" />
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
+              Ready to capture attendance
+            </p>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 6, lineHeight: 1.6, maxWidth: 280 }}>
+              45-minute session · auto-capture every 2 min · cumulative recognition
+            </p>
+          </div>
+          <button
+            onClick={startSession}
+            disabled={trainedCount === 0}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "12px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+              background: trainedCount === 0 ? "rgba(255,255,255,0.1)" : ICON_GRAD,
+              color: "#fff", border: "none", cursor: trainedCount === 0 ? "not-allowed" : "pointer",
+              boxShadow: trainedCount > 0 ? "0 8px 24px rgba(15,164,175,0.4)" : "none",
+              opacity: trainedCount === 0 ? 0.5 : 1,
+            }}
+          >
+            <Play size={17} /> Start 45-Min Session
+          </button>
+          {trainedCount === 0 && (
+            <p style={{ fontSize: 11.5, color: "rgba(255,100,100,0.9)" }}>⚠️ No trained students. Train the model first.</p>
+          )}
+        </>
       )}
     </div>
   )}
@@ -652,41 +830,81 @@ export default function AttendanceCapturePage() {
                   {sessionActive && (
                     <div style={{
                       position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-                      display: "flex", flexDirection: "column", gap: 10,
-                      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
-                      padding: "12px 20px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.15)",
-                      zIndex: 10
+                      display: "flex", alignItems: "flex-end", gap: 12,
+                      zIndex: 10,
                     }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <span style={{ color: "#fff", display: "flex" }}><ZoomOut size={16} /></span>
-                        <input
-                          type="range" min="0.5" max="10" step="0.1" value={zoom}
-                          onChange={(e) => handleZoom(parseFloat(e.target.value))}
-                          style={{ width: 120, accentColor: C.accent }}
-                        />
-                        <span style={{ color: "#fff", display: "flex" }}><ZoomIn size={16} /></span>
-                      </div>
-                      
-                      {/* Pan Left/Right */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <span style={{ color: "#fff", display: "flex" }}><ChevronLeft size={16} /></span>
-                        <input
-                          type="range" min="-200" max="200" step="1" value={pan}
-                          onChange={(e) => handlePan(parseInt(e.target.value))}
-                          style={{ width: 120, accentColor: C.accent }}
-                        />
-                        <span style={{ color: "#fff", display: "flex" }}><ChevronRight size={16} /></span>
+                      {/* Directional Pad (Pan / Tilt) */}
+                      <div style={{
+                        position: "relative", width: 120, height: 120,
+                        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px) saturate(1.4)",
+                        borderRadius: "50%", border: "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)",
+                      }}>
+                        {/* Up */}
+                        <button onClick={() => handleTilt(Math.max(-100, tilt - 30))}
+                          style={{ position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "translateX(-50%) scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.transform = "translateX(-50%) scale(1)"; }}
+                        ><ChevronUp size={16} /></button>
+                        {/* Down */}
+                        <button onClick={() => handleTilt(Math.min(100, tilt + 30))}
+                          style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "translateX(-50%) scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.transform = "translateX(-50%) scale(1)"; }}
+                        ><ChevronDown size={16} /></button>
+                        {/* Left */}
+                        <button onClick={() => handlePan(Math.max(-100, pan - 30))}
+                          style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "translateY(-50%) scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.transform = "translateY(-50%) scale(1)"; }}
+                        ><ChevronLeft size={16} /></button>
+                        {/* Right */}
+                        <button onClick={() => handlePan(Math.min(100, pan + 30))}
+                          style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "translateY(-50%) scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.transform = "translateY(-50%) scale(1)"; }}
+                        ><ChevronRight size={16} /></button>
+                        {/* Center Reset */}
+                        <button onClick={() => { handlePan(0); handleTilt(0); }}
+                          style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 34, height: 34, borderRadius: "50%", border: "2px solid rgba(15,164,175,0.5)", background: "rgba(15,164,175,0.15)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s ease", fontSize: 9, fontWeight: 700, letterSpacing: "0.02em" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.4)"; e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translate(-50%,-50%) scale(1.1)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.15)"; e.currentTarget.style.borderColor = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "translate(-50%,-50%) scale(1)"; }}
+                          title="Reset pan & tilt"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 1 3 6.36"/><path d="M3 21V12H12"/></svg>
+                        </button>
                       </div>
 
-                      {/* Tilt Up/Down */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <span style={{ color: "#fff", display: "flex" }}><ChevronUp size={16} /></span>
-                        <input
-                          type="range" min="-200" max="200" step="1" value={tilt}
-                          onChange={(e) => handleTilt(parseInt(e.target.value))}
-                          style={{ width: 120, accentColor: C.accent }}
-                        />
-                        <span style={{ color: "#fff", display: "flex" }}><ChevronDown size={16} /></span>
+                      {/* Zoom Strip */}
+                      <div style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px) saturate(1.4)",
+                        borderRadius: 28, padding: "8px 6px",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)",
+                      }}>
+                        <button onClick={() => handleZoom(Math.min(10, zoom + 0.5))}
+                          style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.transform = "scale(1)"; }}
+                          title="Zoom in"
+                        ><ZoomIn size={15} /></button>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.7)", padding: "4px 0", letterSpacing: "0.02em", userSelect: "none" }}>{zoom.toFixed(1)}×</span>
+                        <button onClick={() => handleZoom(Math.max(0.5, zoom - 0.5))}
+                          style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15,164,175,0.5)"; e.currentTarget.style.transform = "scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.transform = "scale(1)"; }}
+                          title="Zoom out"
+                        ><ZoomOut size={15} /></button>
+                        <div style={{ width: 20, height: 1, background: "rgba(255,255,255,0.15)", margin: "4px 0" }} />
+                        <button onClick={() => { handleZoom(1); handlePan(0); handleTilt(0); }}
+                          style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease", fontSize: 9, fontWeight: 700 }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.3)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.transform = "scale(1.15)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; e.currentTarget.style.transform = "scale(1)"; }}
+                          title="Reset all controls"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 1 3 6.36"/><path d="M3 21V12H12"/></svg>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -761,7 +979,8 @@ export default function AttendanceCapturePage() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto", paddingRight: 4 }}>
                           {Array.from(allPresentSet).map((sid) => {
                             const s = students.find((st) => st.id === sid);
-                            if (!s) return null;
+                            const displayName = s?.name || sid;
+                            const displayEmail = s?.email || "";
                             const isManual = manuallyMarked.has(sid) && !allRecognizedStudents.has(sid);
                             return (
                               <div key={sid} style={{
@@ -771,8 +990,8 @@ export default function AttendanceCapturePage() {
                                 border: `1px solid ${isManual ? "rgba(16,185,129,0.15)" : C.borderHov}`,
                               }}>
                                 <div>
-                                  <p style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{s.name}</p>
-                                  <p style={{ fontSize: 11, color: C.body, marginTop: 2 }}>{s.email}</p>
+                                  <p style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{displayName}</p>
+                                  {displayEmail && <p style={{ fontSize: 11, color: C.body, marginTop: 2 }}>{displayEmail}</p>}
                                 </div>
                                 <span style={{
                                   padding: "3px 10px", borderRadius: 20,
@@ -825,7 +1044,7 @@ export default function AttendanceCapturePage() {
                         )}
                         {sessionActive && recognizedCount > 0 && (
                           <p style={{ fontSize: 11.5, textAlign: "center", color: C.body }}>
-                            💡 You can submit now or wait until the session ends
+                            You can submit now or wait until the session ends
                           </p>
                         )}
                       </div>
@@ -915,7 +1134,7 @@ export default function AttendanceCapturePage() {
                 {allRecognizedStudents.size > 0 && (
                   <div style={{ marginBottom: 20 }}>
                     <p style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>
-                      🤖 AI Recognized ({allRecognizedStudents.size})
+                      AI Recognized ({allRecognizedStudents.size})
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {Array.from(allRecognizedStudents).map((sid) => {

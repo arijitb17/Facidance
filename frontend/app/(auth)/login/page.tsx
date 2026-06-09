@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, ArrowRight, Sparkles, GraduationCap, Shield, Zap } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Sparkles, GraduationCap, Shield, Zap, Info } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/lib/useToast";
 import { ToastContainer } from "@/components/ToastContainer";
@@ -48,7 +48,21 @@ function InputField({
       }}>
         {label}
       </label>
-      <div style={{ position: "relative" }}>
+      <div style={{ 
+        position: "relative",
+        width: "100%",
+        padding: suffix ? "12px 48px 12px 16px" : "12px 16px",
+        borderRadius: 12,
+        border: `1px solid ${focused ? C.borderHov : C.border}`,
+        background: focused ? C.white : "#f8fafc",
+        boxShadow: focused
+          ? `0 0 0 3px rgba(15,164,175,0.12), ${SHADOW_REST}`
+          : SHADOW_REST,
+        transition: EASE_ALL,
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center"
+      }}>
         <input
           type={type}
           value={value}
@@ -60,16 +74,13 @@ function InputField({
           required={required}
           style={{
             width: "100%",
-            padding: suffix ? "12px 48px 12px 16px" : "12px 16px",
-            borderRadius: 12,
-            border: `1px solid ${focused ? C.borderHov : C.border}`,
-            background: focused ? C.white : "#f8fafc",
-            color: C.text, fontSize: 14, outline: "none",
-            boxShadow: focused
-              ? `0 0 0 3px rgba(15,164,175,0.12), ${SHADOW_REST}`
-              : SHADOW_REST,
-            transition: EASE_ALL,
-            boxSizing: "border-box",
+            border: "none",
+            background: "transparent",
+            color: C.text, 
+            fontSize: 14, 
+            outline: "none",
+            padding: 0,
+            margin: 0,
           }}
         />
         {suffix && (
@@ -91,7 +102,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
-  const [hovBtn,   setHovBtn]   = useState(false);
   const { toasts, toast, removeToast } = useToast();
 
   async function handleLogin(e?: React.FormEvent) {
@@ -157,6 +167,8 @@ export default function LoginPage() {
             alt="Department of Information Technology, Gauhati University"
             fill
             priority
+            quality={70}
+            sizes="(max-width: 768px) 100vw, 50vw"
             style={{ objectFit: "cover", objectPosition: "center top" }}
           />
 
@@ -336,7 +348,7 @@ export default function LoginPage() {
       lineHeight: 1.1,
     }}
   >
-    Welcome back 👋
+    Welcome back
   </h1>
 
   <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
@@ -379,12 +391,29 @@ export default function LoginPage() {
                   </button>
                 }
               />
+              
+              <div style={{ 
+                marginTop: -10, 
+                fontSize: 12, 
+                color: C.accent, 
+                lineHeight: 1.4,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                background: "rgba(15,164,175,0.06)",
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(15,164,175,0.15)"
+              }}>
+                <Info size={14} style={{ flexShrink: 0 }} />
+                <span>For students, your password is your DOB in <strong>YYYY/MM/DD</strong> format.</span>
+              </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                onMouseEnter={() => setHovBtn(true)}
-                onMouseLeave={() => setHovBtn(false)}
+                className="submit-btn"
                 style={{
                   width: "100%", padding: "13px 20px",
                   borderRadius: 12, border: "none",
@@ -394,10 +423,6 @@ export default function LoginPage() {
                   cursor: loading ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center",
                   justifyContent: "center", gap: 8,
-                  boxShadow: !loading && hovBtn ? SHADOW_ACT
-                    : !loading ? "0 8px 24px rgba(15,164,175,0.3)" : "none",
-                  transform: !loading && hovBtn
-                    ? "translateY(-2px) scale(1.01)" : "translateY(0) scale(1)",
                   transition: EASE_ALL,
                   opacity: loading ? 0.7 : 1,
                   marginTop: 4,
@@ -470,6 +495,15 @@ export default function LoginPage() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .submit-btn {
+          box-shadow: 0 8px 24px rgba(15,164,175,0.3);
+          transform: translateY(0) scale(1);
+        }
+        .submit-btn:not(:disabled):hover {
+          box-shadow: ${SHADOW_ACT} !important;
+          transform: translateY(-2px) scale(1.01) !important;
+        }
 
         @media (max-width: 768px) {
           .auth-root {

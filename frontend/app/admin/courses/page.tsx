@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { BookOpen, GraduationCap, Trash2, PlusCircle, X, Loader2, Users, Edit2, ChevronDown, Search, Check } from "lucide-react";
+import { BookOpen, GraduationCap, Trash2, PlusCircle, X, Loader2, Users, Edit2, ChevronDown, Search, Check, User, Building2, Calendar, Key } from "lucide-react";
 import { useCourses, useTeachers, usePrograms, useDepartments } from "@/hooks/useAdmin";
 import { coursesApi } from "@/lib/api";
 import { useToast } from "@/lib/useToast";
@@ -185,14 +185,18 @@ export default function CoursesPage() {
         }
 
         .course-row {
-          display: flex; flex-direction: row;
+          display: flex; flex-direction: row; flex-wrap: wrap;
           align-items: center; gap: 10px;
           padding: 10px 12px; border-radius: 12px;
           border: 1px solid rgba(226,232,240,0.7);
           background: rgba(248,250,252,0.8);
-          transition: all 0.2s ease; min-width: 0;
+          transition: all 0.2s ease; min-width: 0; box-sizing: border-box;
         }
         .course-row:hover { background: #fff; border-color: rgba(15,164,175,0.22); box-shadow: 0 6px 20px rgba(0,49,53,0.08); }
+        .course-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
+        @media (max-width: 540px) {
+          .course-actions { width: 100%; padding-left: 44px; margin-left: 0; margin-top: 2px; box-sizing: border-box; }
+        }
 
         .ci { height: 34px; width: 34px; min-width: 34px; border-radius: 10px; background: ${ICON_GRAD}; display: flex; align-items: center; justify-content: center; }
 
@@ -379,12 +383,77 @@ export default function CoursesPage() {
   );
 }
 
+function CourseDetailsModal({ course, onClose }: {
+  course: any;
+  onClose: () => void;
+}) {
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+    }} onClick={onClose}>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", animation: "fadeIn 0.2s ease forwards", willChange: "opacity" }} />
+      <div onClick={(e) => e.stopPropagation()} style={{
+        position: "relative", width: "100%", maxWidth: 420,
+        background: "#fff", borderRadius: 24,
+        boxShadow: "0 20px 40px rgba(0,49,53,0.15)", overflow: "hidden",
+        animation: "modalIn 0.25s cubic-bezier(.2,.8,.4,1) forwards",
+        willChange: "transform, opacity",
+      }}>
+        <div style={{ padding: "24px 24px 20px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid rgba(226,232,240,0.6)", background: "linear-gradient(180deg, rgba(248,250,252,0.6) 0%, #fff 100%)" }}>
+          <div style={{ height: 48, width: 48, minWidth: 48, borderRadius: 14, background: ICON_GRAD, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 16px rgba(15,164,175,0.25)" }}>
+            <BookOpen size={22} color="#fff" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#003135", letterSpacing: "-0.02em", lineHeight: 1.2 }}>{course.name}</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, fontWeight: 600, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontFamily: "monospace", background: "rgba(226,232,240,0.5)", padding: "2px 6px", borderRadius: 6, color: "#475569" }}>{course.code || "No Code"}</span>
+            </p>
+          </div>
+        </div>
+
+        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            { icon: User, label: "Teacher", value: course.teacher_name || "Unassigned", sub: course.teacher_email || "", highlight: false },
+            { icon: Building2, label: "Department", value: course.department_name || "—", sub: "", highlight: false },
+            { icon: GraduationCap, label: "Program", value: course.program_name || "—", sub: "", highlight: false },
+            { icon: Calendar, label: "Year & Semester", value: [course.academic_year_name, course.semester_name].filter(Boolean).join(" • ") || "—", sub: "", highlight: false },
+            { icon: Key, label: "Entry Code", value: course.entry_code || "—", sub: "", highlight: true },
+          ].map((itm, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderRadius: 16, background: itm.highlight ? "rgba(15,164,175,0.06)" : "#f8fafc", border: itm.highlight ? "1px solid rgba(15,164,175,0.2)" : "1px solid rgba(226,232,240,0.7)" }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: itm.highlight ? "rgba(15,164,175,0.15)" : "#fff", border: itm.highlight ? "1px solid rgba(15,164,175,0.3)" : "1px solid rgba(226,232,240,0.8)", display: "flex", alignItems: "center", justifyContent: "center", color: itm.highlight ? "#0FA4AF" : "#64748b", boxShadow: itm.highlight ? "none" : "0 2px 4px rgba(0,0,0,0.02)" }}>
+                <itm.icon size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: itm.highlight ? "#0FA4AF" : "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{itm.label}</p>
+                <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: itm.highlight ? "#003135" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{itm.value}</p>
+                {itm.sub && <p style={{ margin: "1px 0 0", fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{itm.sub}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: "0 24px 24px" }}>
+          <button onClick={onClose} style={{ width: "100%", padding: "14px 0", borderRadius: 14, background: "#003135", color: "#fff", border: "none", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 6px 16px rgba(0,49,53,0.2)", transition: "all 0.2s ease" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-2px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "none"}>
+            Close Details
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CourseRow({ course, teachers, onDelete, onChangeTeacher }: {
   course: { id: string; name: string; code?: string | null; teacher_id?: string | null; teacher_name?: string | null; academic_year_name?: string | null; semester_name?: string | null };
   teachers: { id: string; name: string; departmentName?: string | null }[];
   onDelete: () => void;
   onChangeTeacher: (teacherId: string) => void;
 }) {
+  const [showModal, setShowModal] = useState(false);
   const [showReassign, setShowReassign] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [search, setSearch] = useState("");
@@ -411,8 +480,9 @@ function CourseRow({ course, teachers, onDelete, onChangeTeacher }: {
   }
 
   return (
+    <>
     <div style={{ borderRadius: 12, border: `1px solid rgba(226,232,240,0.7)`, background: "rgba(248,250,252,0.8)", transition: "all 0.2s ease", overflow: "visible", position: "relative", zIndex: dropdownOpen ? 10 : 1 }}>
-      <div className="course-row" style={{ border: "none", borderRadius: 0 }}>
+      <div className="course-row" style={{ border: "none", borderRadius: 0, cursor: "pointer" }} onClick={() => setShowModal(true)}>
         <div className="ci"><BookOpen size={14} color="#fff" /></div>
         <div className="cinfo">
           <p className="cname">{course.name}</p>
@@ -428,9 +498,9 @@ function CourseRow({ course, teachers, onDelete, onChangeTeacher }: {
             <span className="csem">{[course.academic_year_name, course.semester_name].filter(Boolean).join(" · ") || "—"}</span>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        <div className="course-actions">
           <button
-            onClick={() => { setShowReassign((p) => !p); setSelectedTeacher(""); setSearch(""); setDropdownOpen(false); }}
+            onClick={(e) => { e.stopPropagation(); setShowReassign((p) => !p); setSelectedTeacher(""); setSearch(""); setDropdownOpen(false); }}
             style={{
               display: "inline-flex", alignItems: "center", gap: 3,
               padding: "5px 9px", height: 28, borderRadius: 7,
@@ -443,7 +513,7 @@ function CourseRow({ course, teachers, onDelete, onChangeTeacher }: {
           >
             <Edit2 size={10} /> {showReassign ? "Cancel" : "Change Teacher"}
           </button>
-          <button className="delbtn" onClick={onDelete}><Trash2 size={11} /> Delete</button>
+          <button className="delbtn" onClick={(e) => { e.stopPropagation(); onDelete(); }}><Trash2 size={11} /> Delete</button>
         </div>
       </div>
       {showReassign && (
@@ -586,5 +656,7 @@ function CourseRow({ course, teachers, onDelete, onChangeTeacher }: {
         </div>
       )}
     </div>
+    {showModal && <CourseDetailsModal course={course} onClose={() => setShowModal(false)} />}
+    </>
   );
 }

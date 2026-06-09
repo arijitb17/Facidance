@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Search, Upload, X, AlertCircle, Users,
-  UserCheck, UserX, ChevronDown, Filter, UserPlus
+  UserCheck, UserX, ChevronDown, Filter, UserPlus, Check
 } from "lucide-react";
 import { useToast } from "@/lib/useToast";
 import { ToastContainer } from "@/components/ToastContainer";
@@ -232,6 +232,24 @@ export default function TeacherStudents() {
       toast.error("Enrollment failed", err.message);
     } finally {
       setEnrollingStudentId(null);
+    }
+  }
+
+  const [studentToRemove, setStudentToRemove] = useState<{ student: Student; courseId: string; courseName: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
+
+  async function handleConfirmRemove() {
+    if (!studentToRemove) return;
+    setRemoving(true);
+    try {
+      await teacherCoursesApi.removeStudent(studentToRemove.courseId, studentToRemove.student.id);
+      toast.success("Student removed", `Successfully disenrolled ${studentToRemove.student.user.name} from ${studentToRemove.courseName}.`);
+      setStudentToRemove(null);
+      await fetchData();
+    } catch (err: any) {
+      toast.error("Failed to remove student", err.message || "An error occurred");
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -721,7 +739,15 @@ const firstSheet = workbook.Sheets[sheetName];
               <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
-                    {["Student", "Program", "Department", "Courses", "Attendance", "Face Data"].map((h) => (
+                    {[
+                      "Student",
+                      "Program",
+                      "Department",
+                      "Courses",
+                      "Attendance",
+                      "Face Data",
+                      ...(selectedCourseFilter ? ["Actions"] : [])
+                    ].map((h) => (
                       <th key={h} style={{
                         padding: "12px 24px", textAlign: "left",
                         fontSize: 10.5, fontWeight: 700, color: C.muted,
@@ -737,6 +763,11 @@ const firstSheet = workbook.Sheets[sheetName];
                       key={student.id}
                       student={student}
                       isLast={idx === filteredStudents.length - 1}
+                      teacherCourses={courses}
+                      selectedCourseFilter={selectedCourseFilter}
+                      onRemove={(student, courseId, courseName) => {
+                        setStudentToRemove({ student, courseId, courseName });
+                      }}
                     />
                   ))}
                 </tbody>
@@ -746,8 +777,79 @@ const firstSheet = workbook.Sheets[sheetName];
         </Card>
       </div>
 
+      {studentToRemove && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16
+        }}>
+          <div style={{
+            background: C.white, borderRadius: 20, border: `1px solid ${C.border}`,
+            boxShadow: "0 32px 80px rgba(0,49,53,0.22)", width: "100%", maxWidth: 440,
+            position: "relative", display: "flex", flexDirection: "column", animation: "modalIn 0.3s cubic-bezier(.22,.68,0,1.2)"
+          }}>
+            <button onClick={() => setStudentToRemove(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: C.muted, zIndex: 10 }}>
+              <X size={18} />
+            </button>
+            <div style={{ padding: "28px 24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <div style={{ height: 44, width: 44, minWidth: 44, borderRadius: "50%", background: "linear-gradient(135deg, #be123c 0%, #e11d48 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <UserX size={20} color="#fff" />
+                </div>
+                <p style={{ fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>Remove Student from Course</p>
+              </div>
+              <p style={{ fontSize: 14, color: C.body, marginBottom: 10, lineHeight: 1.5 }}>
+                Are you sure you want to remove <strong style={{ color: C.text }}>{studentToRemove.student.user.name}</strong> from <strong style={{ color: C.text }}>{studentToRemove.courseName}</strong>?
+              </p>
+              <div style={{
+                background: "#fffbeb", border: "1px solid #fef3c7", borderRadius: 12, padding: "12px 14px",
+                display: "flex", gap: 10, marginBottom: 22
+              }}>
+                <AlertCircle size={16} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12.5, color: "#b45309", margin: 0, lineHeight: 1.4 }}>
+                  <strong>Mid-semester Change:</strong> This student will be disenrolled. Their attendance records and details will no longer appear on rosters or reports for this course.
+                </p>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setStudentToRemove(null)}
+                  disabled={removing}
+                  style={{
+                    padding: "9px 18px", borderRadius: 10, border: `1px solid ${C.border}`,
+                    background: "transparent", color: C.textSoft, fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", transition: EASE_ALL
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRemove}
+                  disabled={removing}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "9px 18px", borderRadius: 10, border: "none",
+                    background: "linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)",
+                    color: "#fff", fontSize: 13, fontWeight: 600,
+                    cursor: removing ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 12px rgba(225,29,72,0.25)",
+                    transition: EASE_ALL, opacity: removing ? 0.7 : 1
+                  }}
+                >
+                  {removing ? (
+                    <div style={{ width: 14, height: 14, border: "2px solid transparent", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />
+                  ) : <UserX size={14} />}
+                  {removing ? "Removing..." : "Remove Student"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @media (max-width: 900px)  { .stat-grid { grid-template-columns: repeat(2, 1fr) !important; } }
         @media (max-width: 540px)  { .stat-grid { grid-template-columns: repeat(2, 1fr) !important; } .import-grid { grid-template-columns: 1fr !important; } }
       `}</style>
@@ -755,9 +857,25 @@ const firstSheet = workbook.Sheets[sheetName];
   );
 }
 
-function StudentRow({ student, isLast }: { student: Student; isLast: boolean }) {
+function StudentRow({ 
+  student, 
+  isLast, 
+  teacherCourses, 
+  selectedCourseFilter, 
+  onRemove 
+}: { 
+  student: Student; 
+  isLast: boolean; 
+  teacherCourses: Course[]; 
+  selectedCourseFilter: string; 
+  onRemove: (student: Student, courseId: string, courseName: string) => void;
+}) {
   const [hov, setHov] = useState(false);
   const faceOk = student.faceEmbedding;
+
+  const studentTeacherCourses = useMemo(() => {
+    return student.courses?.filter(sc => teacherCourses.some(tc => tc.id === sc.id)) || [];
+  }, [student.courses, teacherCourses]);
 
   return (
     <tr
@@ -775,7 +893,59 @@ function StudentRow({ student, isLast }: { student: Student; isLast: boolean }) 
       </td>
       <td style={{ padding: "13px 24px", fontSize: 13, color: C.body }}>{student.program.name}</td>
       <td style={{ padding: "13px 24px", fontSize: 13, color: C.body }}>{student.program.department.name}</td>
-      <td style={{ padding: "13px 24px", fontSize: 13, fontWeight: 700, color: C.text }}>{student._count.courses}</td>
+      <td style={{ padding: "13px 24px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxWidth: 280 }}>
+          {studentTeacherCourses.map((c) => (
+            <span
+              key={c.id}
+              onClick={() => onRemove(student, c.id, c.name)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 10px 4px 12px",
+                borderRadius: 14,
+                fontSize: 12,
+                fontWeight: 600,
+                background: "#f1f5f9",
+                color: C.textSoft,
+                border: `1px solid ${C.border}`,
+                cursor: "pointer",
+                transition: EASE_ALL,
+              }}
+              className="course-badge"
+              title={`Click to remove student from ${c.name}`}
+            >
+              <span style={{ maxWidth: 160, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {c.name}
+              </span>
+              <div 
+                className="badge-close"
+                style={{ 
+                  display: "flex", alignItems: "center", justifyContent: "center", 
+                  width: 16, height: 16, borderRadius: "50%", 
+                  background: "rgba(15,23,42,0.06)", transition: EASE_ALL 
+                }}
+              >
+                <X size={10} style={{ color: C.textSoft }} />
+              </div>
+            </span>
+          ))}
+        </div>
+        <style>{`
+          .course-badge:hover {
+            background: #fef2f2 !important;
+            color: #dc2626 !important;
+            border-color: #fecaca !important;
+          }
+          .course-badge:hover .badge-close {
+            background: #fecaca !important;
+          }
+          .course-badge:hover .badge-close svg {
+            color: #dc2626 !important;
+          }
+        `}</style>
+      </td>
       <td style={{ padding: "13px 24px", fontSize: 13, fontWeight: 700, color: C.text }}>{student._count.attendance}</td>
       <td style={{ padding: "13px 24px" }}>
         <span style={{
@@ -789,6 +959,40 @@ function StudentRow({ student, isLast }: { student: Student; isLast: boolean }) 
           {faceOk ? "Registered" : "Missing"}
         </span>
       </td>
+      {selectedCourseFilter && (
+        <td style={{ padding: "13px 24px" }}>
+          <button
+            onClick={() => {
+              const activeCourse = teacherCourses.find(tc => tc.id === selectedCourseFilter);
+              onRemove(student, selectedCourseFilter, activeCourse?.name ?? "Course");
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 12px",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              border: "1px solid #fecaca",
+              background: "rgba(239,68,68,0.04)",
+              color: "#dc2626",
+              transition: EASE_ALL,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(239,68,68,0.08)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(220,38,38,0.08)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(239,68,68,0.04)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <UserX size={12} /> Remove
+          </button>
+        </td>
+      )}
     </tr>
   );
 }

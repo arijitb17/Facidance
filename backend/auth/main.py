@@ -6,34 +6,16 @@ Runs on port 8000.
 
 Start with:
     uvicorn backend.auth.main:app --port 8000 --reload
-
-Metrics
--------
-GET /metrics  — Prometheus text exposition (scrape this endpoint).
-
-The instrumentator automatically tracks:
-  - http_requests_total{method, handler, status}
-  - http_request_duration_seconds{method, handler, status}
-  - http_request_size_bytes / http_response_size_bytes
-  - in_progress requests gauge
-
-Business-level metrics (login outcomes, registration, tokens) are defined
-in backend/auth/metrics.py and incremented in backend/auth/service.py.
 """
 
 from contextlib import asynccontextmanager
 import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from backend.common.prisma_client import connect, disconnect
 from backend.auth.router import router
-
-# Import metrics module early so all metric objects are registered with the
-# default Prometheus registry before the /metrics endpoint is exposed.
-import backend.common.metrics  # noqa: F401  (side-effect import)
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 @asynccontextmanager
@@ -51,21 +33,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ---------------------------------------------------------------------------
-# Prometheus — auto-instrument all HTTP routes
-# ---------------------------------------------------------------------------
-# expose=True mounts GET /metrics automatically.
-# exclude_paths skips /health and /metrics from being tracked themselves
-# to avoid polluting latency histograms with infrastructure noise.
-# ---------------------------------------------------------------------------
-Instrumentator(
-    should_group_status_codes=False,
-    excluded_handlers=["/health", "/metrics"],
-).instrument(app).expose(app, include_in_schema=False)
-
-# ---------------------------------------------------------------------------
-# CORS
-# ---------------------------------------------------------------------------
+# Allow Next.js frontend (adjust origins for production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],
@@ -76,10 +44,10 @@ app.add_middleware(
 
 app.include_router(router)
 
+# Enable Prometheus metrics
+Instrumentator().instrument(app).expose(app)
 
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
+
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok", "service": "auth", "port": 8000}

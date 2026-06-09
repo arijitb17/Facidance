@@ -257,7 +257,7 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading }: {
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {title}
           </p>
           {loading ? <SkeletonLine w={80} h={36} /> : (
@@ -275,7 +275,7 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading }: {
                 {trend === "up"
                   ? <TrendingUp  size={11} color="#10b981" />
                   : <TrendingDown size={11} color="#f97316" />}
-                <span style={{ fontSize: 11, fontWeight: 700, color: trend === "up" ? "#10b981" : "#f97316" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: trend === "up" ? "#10b981" : "#f97316", whiteSpace: "nowrap" }}>
                   {trendLabel}
                 </span>
               </div>
@@ -533,7 +533,7 @@ export default function TeacherDashboard() {
   className="header-wrap"
 >
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>Welcome back 👋</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>Welcome back</h1>
           <p style={{ fontSize: 14, color: C.body, marginTop: 6, lineHeight: 1.5 }}>Here's what's happening across your courses today.</p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -727,16 +727,17 @@ export default function TeacherDashboard() {
 
         /* Mobile */
         @media (max-width: 640px) {
-          .stat-grid   { grid-template-columns: repeat(2, 1fr) !important; }
+          .stat-grid   { grid-template-columns: 1fr !important; }
           .chart-grid  { grid-template-columns: 1fr !important; }
           .bottom-grid { grid-template-columns: 1fr !important; }
           .qa-grid     { grid-template-columns: repeat(2, 1fr) !important; }
+          .header-wrap { flex-direction: column; align-items: flex-start !important; }
         }
 
         /* Small mobile */
         @media (max-width: 400px) {
-          .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .qa-grid   { grid-template-columns: repeat(2, 1fr) !important; }
+          .stat-grid { grid-template-columns: 1fr !important; }
+          .qa-grid   { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

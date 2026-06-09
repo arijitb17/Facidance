@@ -381,7 +381,7 @@ export default function StudentProfilePage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-                    Graduated 🎓
+                    Graduated
                   </h3>
                   <p style={{ fontSize: 13, color: C.body, margin: "2px 0 0 0" }}>
                     Your academic journey here is complete

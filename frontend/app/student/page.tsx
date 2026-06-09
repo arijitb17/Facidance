@@ -53,42 +53,44 @@ function StatCard({ title, value, Icon, trend, trendLabel, loading }: {
       onMouseLeave={() => setHov(false)}
       style={{
         background: CARD_GRAD, border: `1px solid ${hov ? C.borderHov : C.border}`,
-        borderRadius: 18, padding: "22px 24px",
+        borderRadius: 18, padding: "18px 16px",
         boxShadow: hov ? SHADOW.hover : SHADOW.rest,
         transform: hov ? "translateY(-5px) scale(1.01)" : "translateY(0) scale(1)",
         transition: EASE_ALL, overflow: "hidden", position: "relative",
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {title}
           </p>
           {loading ? (
             <div style={{ width: 60, height: 34, borderRadius: 8, background: "linear-gradient(90deg,#f1f5f9 25%,#e8f0f5 50%,#f1f5f9 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.6s ease-in-out infinite", marginTop: 10 }} />
           ) : (
-            <p style={{ fontSize: 34, fontWeight: 800, color: C.text, lineHeight: 1, marginTop: 10, letterSpacing: "-0.03em" }}>
+            <p style={{ fontSize: 28, fontWeight: 800, color: C.text, lineHeight: 1, marginTop: 10, letterSpacing: "-0.03em" }}>
               {value}
             </p>
           )}
           {!loading && trend && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8 }}>
-              {trend === "up" ? <TrendingUp size={12} color="#059669" /> : <TrendingDown size={12} color="#dc2626" />}
-              <span style={{ fontSize: 11, fontWeight: 600, color: trend === "up" ? "#059669" : "#dc2626" }}>
+              <div style={{ flexShrink: 0 }}>
+                {trend === "up" ? <TrendingUp size={12} color="#059669" /> : <TrendingDown size={12} color="#dc2626" />}
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: trend === "up" ? "#059669" : "#dc2626", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {trendLabel}
               </span>
             </div>
           )}
         </div>
         <div style={{
-          height: 50, width: 50, borderRadius: 14, flexShrink: 0,
+          height: 42, width: 42, borderRadius: 12, flexShrink: 0,
           background: ICON_GRAD,
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: hov ? "0 8px 24px rgba(15,164,175,0.38)" : "0 6px 20px rgba(15,164,175,0.28)",
           transform: hov ? "scale(1.1) rotate(-3deg)" : "scale(1) rotate(0deg)",
           transition: EASE_ALL,
         }}>
-          <Icon size={22} color="#fff" strokeWidth={2} />
+          <Icon size={18} color="#fff" strokeWidth={2} />
         </div>
       </div>
       {/* Decorative corner */}
@@ -296,7 +298,7 @@ function AlumniDashboard({ name, totalCourses, totalPresent, attendancePct }: {
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             margin: 0,
           }}>
-            Congratulations, {name}! 🎓
+            Congratulations, {name}!
           </h1>
         </div>
 
@@ -442,7 +444,28 @@ function AlumniDashboard({ name, totalCourses, totalPresent, attendancePct }: {
           100% { background-position: -200% 0; }
         }
         @media (max-width: 540px) {
-          .alumni-stat-grid { grid-template-columns: 1fr !important; max-width: 200px !important; margin: 0 auto; }
+          .alumni-stat-grid { 
+            grid-template-columns: repeat(3, 1fr) !important; 
+            max-width: 100% !important; 
+            gap: 8px !important; 
+          }
+          .alumni-stat-grid > div {
+            padding: 14px 6px !important;
+          }
+          .alumni-stat-grid p:last-child {
+            font-size: 8px !important;
+          }
+          .alumni-stat-grid p:nth-child(2) {
+            font-size: 20px !important;
+          }
+          .alumni-stat-grid > div > div:first-child {
+            width: 32px !important;
+            height: 32px !important;
+          }
+          .alumni-stat-grid > div > div:first-child svg {
+            width: 16px !important;
+            height: 16px !important;
+          }
         }
       `}</style>
     </div>
@@ -453,7 +476,7 @@ function AlumniDashboard({ name, totalCourses, totalPresent, attendancePct }: {
 export default function StudentDashboard() {
   const router = useRouter();
   const { data: stats, loading, error } = useStudentStats();
-  const { data: me } = useStudentMe();
+  const { data: me, loading: meLoading } = useStudentMe();
 
   const totalCourses    = stats?.total_courses ?? 0;
   const attendancePct   = stats?.attendance_percentage ?? 0;
@@ -465,6 +488,14 @@ export default function StudentDashboard() {
     { title: "Classes Attended", value: totalPresent,               Icon: CheckCircle2,  trend: undefined,       trendLabel: undefined },
   ];
 
+  if (meLoading) {
+    return (
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 32, height: 32, borderRadius: "50%", border: "3px solid rgba(15,164,175,0.2)", borderTopColor: "#0FA4AF", animation: "spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   const isGraduated = me?.student?.status === "graduated" || false;
 
@@ -496,7 +527,7 @@ export default function StudentDashboard() {
 >
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-            Welcome back 👋
+            Welcome back
           </h1>
           <p style={{ fontSize: 14, color: C.body, marginTop: 6, lineHeight: 1.5 }}>
             Here's an overview of your attendance and courses.
@@ -622,7 +653,7 @@ export default function StudentDashboard() {
                   padding: "10px 12px", borderRadius: 10,
                   background: "#f8fafc", border: `1px solid ${C.border}`,
                 }}>
-                  <span style={{ fontSize: 14, marginTop: -1 }}>💡</span>
+                  <span style={{ fontSize: 14, marginTop: -1 }}></span>
                   <span style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>{tip}</span>
                 </div>
               ))}
@@ -642,12 +673,12 @@ export default function StudentDashboard() {
           .qa-grid    { grid-template-columns: repeat(2, 1fr) !important; }
         }
         @media (max-width: 640px) {
-          .stat-grid  { grid-template-columns: repeat(2, 1fr) !important; }
+          .stat-grid  { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
           .qa-grid    { grid-template-columns: repeat(2, 1fr) !important; }
         }
         @media (max-width: 400px) {
-          .stat-grid  { grid-template-columns: repeat(2, 1fr) !important; }
-          .qa-grid    { grid-template-columns: repeat(2, 1fr) !important; }
+          .stat-grid  { grid-template-columns: 1fr !important; gap: 10px !important; }
+          .qa-grid    { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

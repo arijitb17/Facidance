@@ -9,13 +9,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard, BookOpen, CheckSquare,
   Users, BarChart3, LogOut, Menu, X,
   ClipboardList, User, GraduationCap, Building2,
-  BookMarked, Sparkles, Loader2,
+  BookMarked, Sparkles, Loader2, Terminal,
 } from "lucide-react";
 
 // ─── Design tokens ──────────────────────────────────────────────────────────────
@@ -48,6 +48,7 @@ const ADMIN_NAV = [
   { href: "/admin/programs",    label: "Programs",    Icon: BookMarked      },
   { href: "/admin/courses",     label: "Courses",     Icon: BookOpen        },
   { href: "/admin/students",    label: "Students",    Icon: GraduationCap   },
+  { href: "/admin/logs",        label: "System Logs", Icon: Terminal        },
 ];
 
 type NavItem = { href: string; label: string; Icon: React.ElementType };
@@ -125,26 +126,56 @@ function AdminNavbar({ nameProp }: { nameProp?: string }) {
 
 // ─── Student branch (with AI Tips) ───────────────────────────────────────────────
 function StudentNavbar({ nameProp }: { nameProp?: string }) {
-  const [open,    setOpen]    = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [data,    setData]    = useState<any>(null);
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const hasPrefetched = useRef(false);
 
-  async function fetchSuggestions() {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    // Prefetch AI tips in background
+    if (!hasPrefetched.current) {
+      hasPrefetched.current = true;
+      setIsLoading(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`${STUDENT_BASE}/student/ai-suggestions`, {
+      fetch(`${STUDENT_BASE}/student/ai-suggestions`, {
         headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed");
-      const json = await res.json();
-      setData(json);
-      setOpen(true);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to load AI suggestions");
-    } finally {
-      setLoading(false);
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to load AI suggestions");
+          const json = await res.json();
+          setData(json);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+    }
+  }, []);
+
+  async function handleOpen() {
+    setOpen(true);
+    if (!data && !isLoading) {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${STUDENT_BASE}/student/ai-suggestions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          let detail = "Failed to load AI suggestions";
+          try {
+            const body = await res.json();
+            detail = body?.detail ?? detail;
+          } catch {}
+          throw new Error(detail);
+        }
+        const json = await res.json();
+        setData(json);
+      } catch (err: any) {
+        console.error(err);
+        alert(err?.message || "Failed to load AI suggestions. Please try again.");
+        setOpen(false);
+      } finally {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -169,7 +200,7 @@ function StudentNavbar({ nameProp }: { nameProp?: string }) {
       >
         {/* AI Tips button injected into the navbar right side */}
         <button
-          onClick={fetchSuggestions}
+          onClick={handleOpen}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "9px 14px", borderRadius: 12, border: "none",
@@ -180,7 +211,7 @@ function StudentNavbar({ nameProp }: { nameProp?: string }) {
             transition: EASE,
           }}
         >
-          {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
           AI Tips
         </button>
       </NavbarShell>
@@ -419,6 +450,7 @@ function NavbarShell({ nav, homeHref, displayName, subtitle, children }: ShellPr
     href === homeHref ? pathname === homeHref : pathname.startsWith(href);
 
   function handleSignOut() {
+    if (!window.confirm("Are you sure you want to sign out?")) return;
     localStorage.removeItem("token");
     router.push("/login");
   }
@@ -515,9 +547,9 @@ function NavbarShell({ nav, homeHref, displayName, subtitle, children }: ShellPr
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "7px 13px", borderRadius: 10,
-              background: logoutHov ? "#fef2f2" : "transparent",
-              border: `1px solid ${logoutHov ? "rgba(239,68,68,0.25)" : "#e2e8f0"}`,
-              color: logoutHov ? "#ef4444" : "#94a3b8",
+              background: logoutHov ? "#fee2e2" : "#fef2f2",
+              border: `1px solid ${logoutHov ? "rgba(239,68,68,0.4)" : "rgba(239,68,68,0.2)"}`,
+              color: "#ef4444",
               cursor: "pointer", fontWeight: 600, fontSize: 12.5,
               transition: EASE,
               transform: logoutHov ? "translateY(-1px)" : "translateY(0)",

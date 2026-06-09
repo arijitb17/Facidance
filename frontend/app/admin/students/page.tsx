@@ -55,8 +55,8 @@ function IconBtn({ icon: Icon, onClick, title, variant = "default" }: { icon: Re
   };
   return (
     <button title={title} onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, cursor: "pointer", transition: "all 0.2s ease", ...styles[variant] }}>
-      <Icon size={14} />
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 10, cursor: "pointer", transition: "all 0.2s ease", ...styles[variant] }}>
+      <Icon size={17} />
     </button>
   );
 }

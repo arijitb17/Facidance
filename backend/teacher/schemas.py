@@ -209,6 +209,28 @@ class MarkPresentRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Active Session Sync
+# ---------------------------------------------------------------------------
+
+class ActiveSessionResponse(BaseModel):
+    course_id: str
+    ai_recognized: List[str]
+    manually_marked: List[str]
+
+
+class UpdateManualMarkRequest(BaseModel):
+    course_id: str
+    student_id: str
+    is_present: bool
+
+class SessionStatusUpdate(BaseModel):
+    status: str
+
+class SessionStartRequest(BaseModel):
+    start_time: int
+
+
+# ---------------------------------------------------------------------------
 # Search and Enroll Existing Students
 # ---------------------------------------------------------------------------
 

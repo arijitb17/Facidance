@@ -18,26 +18,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.egg-info/
-dist/
-.venv/
-venv/
-env/
 
 # =========================
 # Env / Secrets
 # =========================
 .env*
 !.env.example
-
-# =========================
-# Biometric / ML data (DO NOT commit)
-# =========================
-backend/face_embeddings.pkl
-backend/dataset/
-backend/test-images/
-backend/output/
-backend/training_visualization.png
 
 # =========================
 # Logs
@@ -69,17 +55,44 @@ Thumbs.db
 next-env.d.ts
 
 # =========================
-# Terraform
-# =========================
-terraform/.terraform/
-terraform/.terraform.lock.hcl
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/*.tfstate.backup
-terraform/terraform.tfvars
-
-# =========================
 # Misc
 # =========================
 *.pem
 coverage/
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+
+# Secrets
+.env
+*.pem
+
+# =========================
+# Python Virtual Env
+# =========================
+venv/
+
+# =========================
+# ML / Dataset / Output
+# =========================
+backend/dataset/
+backend/output/
+backend/face_embeddings.pkl
+backend/training_visualization.png
+dataset/
+output/
+face_embeddings.pkl
+*.pkl
+
+# =========================
+# Temp files
+# =========================
+prisma/temp_schema.prisma
+
+# =========================
+# Local Deployment / Configs
+# =========================
+ecosystem.config.js
+local_nginx.conf
+*.deb
+deploy.sh

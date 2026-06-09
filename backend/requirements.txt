@@ -27,7 +27,22 @@ httpx==0.27.0
 groq>=0.9.0
 
 # ---------------------------
+# Machine Learning / Vision
+# ---------------------------
+opencv-python-headless
+insightface
+onnxruntime
+scikit-learn
+numpy
+mediapipe
+albumentations
+
+# ---------------------------
+# Caching
+# ---------------------------
+redis
+
+# ---------------------------
 # Monitoring
 # ---------------------------
-prometheus-client==0.20.0
-prometheus-fastapi-instrumentator==6.1.0
+prometheus-fastapi-instrumentator
