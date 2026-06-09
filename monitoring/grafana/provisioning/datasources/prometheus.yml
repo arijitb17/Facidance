@@ -1,0 +1,17 @@
+# monitoring/grafana/provisioning/datasources/prometheus.yml
+#
+# Grafana auto-provisions this datasource at startup — no manual setup needed.
+# Open Grafana → Dashboards → Import → paste dashboard ID → Done.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST

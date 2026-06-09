@@ -1,0 +1,16 @@
+# monitoring/grafana/provisioning/dashboards/default.yml
+#
+# Tells Grafana where to find pre-built dashboard JSON files.
+# Drop any .json file into monitoring/grafana/dashboards/ and it
+# auto-appears after a container restart (or within 30s).
+
+apiVersion: 1
+
+providers:
+  - name: default
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
