@@ -4,11 +4,6 @@
  * Typed API client for the Student microservice (FastAPI — port 8003).
  * All calls go through Next.js rewrites (`/api/student/*` → `http://localhost:8003/student/*`),
  * so CORS is handled server-side and the JWT token is forwarded transparently.
- *
- * Add this rewrite to next.config.js:
- *   async rewrites() {
- *     return [{ source: "/api/student/:path*", destination: "http://localhost:8003/student/:path*" }];
- *   }
  */
 
 // ---------------------------------------------------------------------------
@@ -28,7 +23,7 @@ export interface StudentProfile {
     department_name: string | null;
     joined_at: string;
     status: string;
-    face_embedding: boolean | null; // true = has embedding; never raw bytes
+    face_embedding: boolean | null;
   } | null;
 }
 
@@ -55,7 +50,7 @@ export interface CourseDetail extends CourseListItem {
 }
 
 export interface AttendanceRecord {
-  date: string; // YYYY-MM-DD
+  date: string;
   status: boolean;
 }
 
@@ -127,14 +122,14 @@ async function handleResponse<T>(res: Response): Promise<T> {
 // API functions
 // ---------------------------------------------------------------------------
 
-/** GET /student/me — authenticated student's full profile */
 export async function getMe(): Promise<StudentProfile> {
   const res = await fetch(`${BASE}/me`, { headers: authHeaders() });
   return handleResponse<StudentProfile>(res);
 }
 
-/** PATCH /student/profile — update name / email */
-export async function updateProfile(payload: UpdateProfilePayload): Promise<{ id: string; name: string; email: string }> {
+export async function updateProfile(
+  payload: UpdateProfilePayload
+): Promise<{ id: string; name: string; email: string }> {
   const res = await fetch(`${BASE}/profile`, {
     method: "PATCH",
     headers: authHeaders(),
@@ -143,35 +138,36 @@ export async function updateProfile(payload: UpdateProfilePayload): Promise<{ id
   return handleResponse(res);
 }
 
-/** GET /student/check-photos?student_id=<id> — whether the student has a face embedding */
-export async function checkPhotos(studentId: string): Promise<CheckPhotosResponse> {
+export async function checkPhotos(
+  studentId: string
+): Promise<CheckPhotosResponse> {
   const res = await fetch(`${BASE}/check-photos?student_id=${studentId}`, {
     headers: authHeaders(),
   });
   return handleResponse<CheckPhotosResponse>(res);
 }
 
-/** GET /student/stats — dashboard stats */
 export async function getStats(): Promise<StudentStats> {
   const res = await fetch(`${BASE}/stats`, { headers: authHeaders() });
   return handleResponse<StudentStats>(res);
 }
 
-/** GET /student/courses — list enrolled courses */
 export async function listCourses(): Promise<CourseListItem[]> {
   const res = await fetch(`${BASE}/courses`, { headers: authHeaders() });
   const data = await handleResponse<{ courses: CourseListItem[] }>(res);
   return data.courses;
 }
 
-/** GET /student/courses/:id — single course detail (must be enrolled) */
 export async function getCourse(courseId: string): Promise<CourseDetail> {
-  const res = await fetch(`${BASE}/courses/${courseId}`, { headers: authHeaders() });
+  const res = await fetch(`${BASE}/courses/${courseId}`, {
+    headers: authHeaders(),
+  });
   return handleResponse<CourseDetail>(res);
 }
 
-/** POST /student/courses/join — join by entry code */
-export async function joinCourse(entryCode: string): Promise<{ message: string; course_id: string; course_name: string }> {
+export async function joinCourse(
+  entryCode: string
+): Promise<{ message: string; course_id: string; course_name: string }> {
   const res = await fetch(`${BASE}/courses/join`, {
     method: "POST",
     headers: authHeaders(),
@@ -180,8 +176,9 @@ export async function joinCourse(entryCode: string): Promise<{ message: string; 
   return handleResponse(res);
 }
 
-/** DELETE /student/courses/:id/leave — leave an enrolled course */
-export async function leaveCourse(courseId: string): Promise<{ message: string }> {
+export async function leaveCourse(
+  courseId: string
+): Promise<{ message: string }> {
   const res = await fetch(`${BASE}/courses/${courseId}/leave`, {
     method: "DELETE",
     headers: authHeaders(),
@@ -189,13 +186,15 @@ export async function leaveCourse(courseId: string): Promise<{ message: string }
   return handleResponse(res);
 }
 
-/** GET /student/courses/:id/attendance — attendance for one course */
-export async function getCourseAttendance(courseId: string): Promise<CourseAttendanceSummary> {
-  const res = await fetch(`${BASE}/courses/${courseId}/attendance`, { headers: authHeaders() });
+export async function getCourseAttendance(
+  courseId: string
+): Promise<CourseAttendanceSummary> {
+  const res = await fetch(`${BASE}/courses/${courseId}/attendance`, {
+    headers: authHeaders(),
+  });
   return handleResponse<CourseAttendanceSummary>(res);
 }
 
-/** GET /student/history — full attendance history across all courses */
 export async function getAttendanceHistory(): Promise<AttendanceHistoryResponse> {
   const res = await fetch(`${BASE}/history`, { headers: authHeaders() });
   return handleResponse<AttendanceHistoryResponse>(res);
@@ -203,22 +202,36 @@ export async function getAttendanceHistory(): Promise<AttendanceHistoryResponse>
 
 /**
  * POST /student/upload-photos
- * Upload face photos. This still hits the Next.js API route (/api/student/upload-photos)
- * because photo processing involves a Python script call from the server side.
- * If you move that logic to FastAPI, update the URL to `${BASE}/upload-photos`.
+ *
+ * Routes: browser → Next.js rewrite → student service → face service (internal).
+ * The face service is on an internal Docker network and must never be called
+ * directly from the browser. All photo uploads go through the student service.
+ *
+ * The Authorization header is forwarded so the student service can verify
+ * the JWT before proxying to face.
  */
-export async function uploadPhotos(studentId: string, photos: { front?: File; left?: File; right?: File }): Promise<{ message: string; studentId: string }> {
+export async function uploadPhotos(
+  studentId: string,
+  photos: { front?: File; left?: File; right?: File }
+): Promise<{ message: string; studentId: string }> {
+  if (!photos.front || !photos.left || !photos.right) {
+    throw new Error("All three photos (front, left, right) are required.");
+  }
+
   const formData = new FormData();
   formData.append("studentId", studentId);
-  if (photos.front) formData.append("front", photos.front);
-  if (photos.left) formData.append("left", photos.left);
-  if (photos.right) formData.append("right", photos.right);
+  formData.append("front", photos.front, photos.front.name);
+  formData.append("left",  photos.left,  photos.left.name);
+  formData.append("right", photos.right, photos.right.name);
 
-  const res = await fetch("/face-api/api/process-student", {
+  // ✅ Goes through student service — never directly to face service
+  const res = await fetch(`${BASE}/upload-photos`, {
     method: "POST",
+    // Do NOT set Content-Type — browser must set it with the multipart boundary
+    headers: { Authorization: `Bearer ${getToken()}` },
     body: formData,
   });
-  
+
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try {
@@ -228,21 +241,5 @@ export async function uploadPhotos(studentId: string, photos: { front?: File; le
     throw new Error(detail);
   }
 
-  const processData = await res.json();
-  
-  // Check if any faces failed to be detected
-  const failures = [];
-  if (processData.results) {
-    for (const [pose, result] of Object.entries(processData.results)) {
-      if (!(result as any).success) {
-        failures.push(`${pose}: ${(result as any).error}`);
-      }
-    }
-  }
-  
-  if (failures.length > 0) {
-    throw new Error(`Face detection failed - ${failures.join(", ")}`);
-  }
-
-  return { message: "Photos uploaded successfully!", studentId };
+  return res.json() as Promise<{ message: string; studentId: string }>;
 }

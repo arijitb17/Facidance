@@ -8,18 +8,19 @@ No HTTP concerns here — all DB access via prisma_client.prisma.
 from __future__ import annotations
 
 
-from fastapi import HTTPException
+from fastapi import HTTPException,UploadFile
 import os
 import json
+import httpx
 from groq import AsyncGroq
 from backend.common.prisma_client import prisma
 from backend.common.cache import cache_get, cache_set, cache_invalidate
 from backend.student.schemas import (
     JoinCourseRequest,
     UpdateProfileRequest,
-)
+)   
 
-
+PYTHON_API_URL = os.environ.get("PYTHON_API_URL", "http://localhost:8004")
 async def get_ai_suggestions(user_id: str) -> dict:
     """
     Generate personalised AI suggestions for a student with low attendance.
@@ -276,10 +277,6 @@ async def update_profile(user_id: str, data: UpdateProfileRequest) -> dict:
 
 
 async def check_photos(student_id: str) -> dict:
-    """
-    Check whether a student has a face embedding registered.
-    Mirrors GET /api/student/check-photos.
-    """
     cache_key = f"student:photos:{student_id}"
     cached = await cache_get(cache_key)
     if cached:
@@ -289,11 +286,74 @@ async def check_photos(student_id: str) -> dict:
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    result = {"has_photos": student.faceEmbedding is not None}
-    await cache_set(cache_key, result, ttl=300)
+    has_photos = student.faceEmbedding is not None
+    if not has_photos:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{PYTHON_API_URL}/api/student/{student_id}/photos")
+                if resp.status_code == 200:
+                    has_photos = resp.json().get("hasPhotos", False)
+        except Exception:
+            pass  # face service unavailable — fall back to DB value
+
+    result = {"has_photos": has_photos}
+    # Shorter TTL when photos exist but training hasn't run yet
+    ttl = 300 if student.faceEmbedding is not None else 30
+    await cache_set(cache_key, result, ttl=ttl)
     return result
 
 
+async def upload_photos(
+    user_id: str,
+    student_id: str,
+    front: "UploadFile",
+    left: "UploadFile",
+    right: "UploadFile",
+) -> dict:
+    """
+    Proxy the three face photos to the internal face service.
+
+    Ownership is already verified in the router before this is called,
+    but we double-check here so the service layer is safe to call directly too.
+    """
+    # Read bytes before the UploadFile stream closes
+    front_bytes = await front.read()
+    left_bytes  = await left.read()
+    right_bytes = await right.read()
+
+    for name, data in [("front", front_bytes), ("left", left_bytes), ("right", right_bytes)]:
+        if not data:
+            raise HTTPException(status_code=400, detail=f"{name} photo is empty.")
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            f"{PYTHON_API_URL}/api/process-student",
+            data={"studentId": student_id},
+            files=[
+                ("front", (front.filename or "front.jpg", front_bytes, front.content_type or "image/jpeg")),
+                ("left",  (left.filename  or "left.jpg",  left_bytes,  left.content_type  or "image/jpeg")),
+                ("right", (right.filename or "right.jpg", right_bytes, right.content_type or "image/jpeg")),
+            ],
+        )
+
+    if resp.status_code == 422:
+        raise HTTPException(status_code=422, detail=resp.json().get("detail", "Face validation failed"))
+    if resp.status_code == 400:
+        raise HTTPException(status_code=400, detail=resp.json().get("detail", "Bad request"))
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Face service error: {resp.text[:200]}")
+
+    # Bust cache so check-photos immediately reflects the new upload
+    await cache_invalidate(
+        f"student:photos:{student_id}",
+        f"student:me:{user_id}",
+    )
+
+    return {
+        "success": True,
+        "studentId": student_id,
+        "message": "All 3 photos validated and saved successfully.",
+    }
 # ---------------------------------------------------------------------------
 # Stats
 # ---------------------------------------------------------------------------

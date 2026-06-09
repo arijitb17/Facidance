@@ -7,7 +7,7 @@ Router → Service ONLY. No DB calls here.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, UploadFile
 
 from backend.admin.dependencies import get_current_student
 from backend.student import service
@@ -39,10 +39,8 @@ async def check_photos(student_id: str, current: StudentUser):
     Query param: ?student_id=<Student.id>
     Validates the student_id belongs to the calling user before checking.
     """
-    # Ensure the student can only check their own photos
     me = await service.get_me(current["id"])
     if not me.get("student") or me["student"]["id"] != student_id:
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     return await service.check_photos(student_id)
 
@@ -62,6 +60,7 @@ async def get_stats(current: StudentUser):
 )
 async def ai_suggestions(current: StudentUser):
     return await service.get_ai_suggestions(current["id"])
+
 
 # ---------------------------------------------------------------------------
 # Courses
@@ -112,3 +111,32 @@ async def course_attendance(
 @router.get("/history", summary="Full attendance history across all courses")
 async def attendance_history(current: StudentUser):
     return await service.get_attendance_history(current["id"])
+
+
+# ---------------------------------------------------------------------------
+# Face photos
+# ---------------------------------------------------------------------------
+
+@router.post("/upload-photos", summary="Upload front/left/right face photos")
+async def upload_photos(
+    current: StudentUser,
+    studentId: str = Form(...),
+    front: UploadFile = File(...),
+    left: UploadFile = File(...),
+    right: UploadFile = File(...),
+):
+    """
+    Proxy face photos to the internal face service.
+    Verifies the studentId belongs to the calling user before forwarding.
+    """
+    me = await service.get_me(current["id"])
+    if not me.get("student") or me["student"]["id"] != studentId:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return await service.upload_photos(
+        user_id=current["id"],
+        student_id=studentId,
+        front=front,
+        left=left,
+        right=right,
+    )

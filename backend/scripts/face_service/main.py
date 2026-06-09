@@ -58,35 +58,44 @@ TEST_FOLDER     = os.path.join(BASE_DIR, "backend", "test-images")
 OUTPUT_FOLDER   = os.path.join(BASE_DIR, "backend", "output")
 EMBEDDINGS_FILE = os.path.join(BASE_DIR, "backend", "face_embeddings.pkl")
 
+# ---------------------------------------------------------------------------
+# Detection sizes to try in order — large first for close faces,
+# smaller sizes catch distant/small faces that buffalo_l misses at 640
+# ---------------------------------------------------------------------------
+DETECTION_SIZES = [(640, 640), (480, 480), (320, 320)]
+
 
 # ---------------------------------------------------------------------------
 # Lazy-load InsightFace once at startup (heavy model)
 # ---------------------------------------------------------------------------
-_face_app = None
+_face_apps: dict = {}   # keyed by det_size tuple
 
-def get_face_app():
-    global _face_app
-    if _face_app is None:
+
+def get_face_app(det_size: tuple = (640, 640)):
+    """Return a FaceAnalysis instance for the given det_size, loading once."""
+    global _face_apps
+    if det_size not in _face_apps:
         t0 = time.perf_counter()
         try:
             from insightface.app import FaceAnalysis
-            _face_app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
-            _face_app.prepare(ctx_id=0, det_size=(640, 640))
+            fa = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+            fa.prepare(ctx_id=0, det_size=det_size)
+            _face_apps[det_size] = fa
             FACE_MODEL_LOAD_TOTAL.labels(status="success").inc()
-            logger.info("InsightFace model loaded")
+            logger.info(f"InsightFace model loaded (det_size={det_size})")
         except Exception:
             FACE_MODEL_LOAD_TOTAL.labels(status="error").inc()
             raise
         finally:
             FACE_MODEL_LOAD_DURATION_SECONDS.observe(time.perf_counter() - t0)
-    return _face_app
+    return _face_apps[det_size]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-warm model on startup so first request isn't slow
+    # Pre-warm primary model on startup so first request isn't slow
     try:
-        get_face_app()
+        get_face_app((640, 640))
     except Exception as e:
         logger.warning(f"Could not pre-warm face model: {e}")
     yield
@@ -104,10 +113,15 @@ Instrumentator(
     excluded_handlers=["/health", "/metrics"],
 ).instrument(app).expose(app, include_in_schema=False)
 
+# ---------------------------------------------------------------------------
+# CORS — allow the frontend origin AND a wildcard fallback so browsers don't
+# block the request before it even reaches the endpoint.
+# ---------------------------------------------------------------------------
+_frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000")],
-    allow_credentials=True,
+    allow_origins=[_frontend_url, "*"],   # wildcard covers all origins in dev/prod
+    allow_credentials=False,              # must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -120,6 +134,56 @@ app.add_middleware(
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok", "service": "face-recognition", "port": 8000}
+
+
+# ---------------------------------------------------------------------------
+# Preprocessing helpers
+# ---------------------------------------------------------------------------
+
+def _preprocess_for_detection(img: np.ndarray) -> list[np.ndarray]:
+    """
+    Return a list of image variants to attempt detection on.
+    Includes: original, CLAHE-enhanced, brightness+contrast boost.
+    Helps detect faces at distance or in poor lighting.
+    """
+    variants = [img]
+
+    # CLAHE — equalises local contrast, best for dim/backlit distant faces
+    try:
+        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        l_eq = clahe.apply(l)
+        lab_eq = cv2.merge([l_eq, a, b])
+        variants.append(cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR))
+    except Exception:
+        pass
+
+    # PIL brightness + contrast + sharpness boost
+    variants.append(_enhance(img))
+
+    return variants
+
+
+def _detect_multiscale(img_rgb: np.ndarray) -> list:
+    """
+    Try multiple det_sizes and image variants; return deduplicated face list.
+    This significantly improves recall for small/distant faces.
+    """
+    all_faces: list = []
+    for det_size in DETECTION_SIZES:
+        fa = get_face_app(det_size)
+        for variant_bgr in _preprocess_for_detection(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)):
+            variant_rgb = cv2.cvtColor(variant_bgr, cv2.COLOR_BGR2RGB)
+            try:
+                detected = fa.get(variant_rgb)
+                all_faces.extend(detected)
+            except Exception as e:
+                logger.debug(f"Detection error (det_size={det_size}): {e}")
+        # If we already found faces at this scale, no need to go smaller
+        if _deduplicate_faces(all_faces):
+            break
+    return _deduplicate_faces(all_faces)
 
 
 # ---------------------------------------------------------------------------
@@ -148,10 +212,11 @@ async def get_student_photos(student_id: str):
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         FACE_PHOTOS_OPS_TOTAL.labels(status="error").inc()
         FACE_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/api/student/{student_id}/photos").inc()
-        raise
+        logger.exception("get_student_photos error")
+        raise HTTPException(status_code=500, detail=str(exc))
     finally:
         FACE_PHOTOS_OP_DURATION_SECONDS.observe(time.perf_counter() - t0)
 
@@ -172,44 +237,70 @@ async def process_student(
     """
     Receive 3 photos (front, left, right) for a student, verify a face is
     detectable in each, and persist them to dataset/<studentId>/.
+
+    Uses InsightFace (buffalo_l) for validation instead of mediapipe so the
+    same model is used end-to-end.  Falls back to mediapipe if insightface
+    detection fails, so poor-quality or distant photos still get a chance.
     """
     t0 = time.perf_counter()
     try:
-        import mediapipe as mp
-
         student_dir = os.path.join(DATASET_PATH, studentId)
         os.makedirs(student_dir, exist_ok=True)
-
-        face_mesh = mp.solutions.face_mesh.FaceMesh(
-            static_image_mode=True, max_num_faces=1, refine_landmarks=True
-        )
 
         results = {}
         for pose, upload in [("front", front), ("left", left), ("right", right)]:
             raw = await upload.read()
+            if not raw:
+                FACE_PROCESS_STUDENT_OPS_TOTAL.labels(status="empty_upload").inc()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{pose} photo upload is empty. Please re-select the file.",
+                )
+
             arr = np.frombuffer(raw, dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
             if img is None:
                 FACE_PROCESS_STUDENT_OPS_TOTAL.labels(status="decode_error").inc()
-                raise HTTPException(status_code=400, detail=f"Could not decode {pose} image")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not decode {pose} image. Please use JPG or PNG.",
+                )
 
-            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            mesh_result = face_mesh.process(rgb)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            if not mesh_result.multi_face_landmarks:
+            # --- Primary: InsightFace multi-scale detection ---
+            faces = _detect_multiscale(img_rgb)
+            face_found = len(faces) > 0
+
+            # --- Fallback: mediapipe FaceMesh (catches faces insightface misses) ---
+            if not face_found:
+                try:
+                    import mediapipe as mp
+                    face_mesh = mp.solutions.face_mesh.FaceMesh(
+                        static_image_mode=True, max_num_faces=1, refine_landmarks=True
+                    )
+                    mesh_result = face_mesh.process(img_rgb)
+                    face_mesh.close()
+                    face_found = bool(mesh_result.multi_face_landmarks)
+                except Exception as mp_err:
+                    logger.debug(f"mediapipe fallback error for {pose}: {mp_err}")
+
+            if not face_found:
                 FACE_PROCESS_STUDENT_OPS_TOTAL.labels(status="no_face_detected").inc()
                 raise HTTPException(
                     status_code=422,
-                    detail=f"No face detected in {pose} photo. Please retake with good lighting.",
+                    detail=(
+                        f"No face detected in {pose} photo. "
+                        "Please ensure good lighting, face the camera clearly, "
+                        "and avoid extreme angles or obstructions."
+                    ),
                 )
 
             save_path = os.path.join(student_dir, f"{pose}.jpg")
             cv2.imwrite(save_path, img)
             results[pose] = "saved"
             logger.info(f"[process-student] {studentId}/{pose}.jpg saved")
-
-        face_mesh.close()
 
         FACE_PROCESS_STUDENT_OPS_TOTAL.labels(status="success").inc()
         return {
@@ -220,10 +311,11 @@ async def process_student(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         FACE_PROCESS_STUDENT_OPS_TOTAL.labels(status="error").inc()
         FACE_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/api/process-student").inc()
-        raise
+        logger.exception("process_student error")
+        raise HTTPException(status_code=500, detail=str(exc))
     finally:
         FACE_PROCESS_STUDENT_OP_DURATION_SECONDS.observe(time.perf_counter() - t0)
 
@@ -239,7 +331,6 @@ async def train_model():
     """
     Walk dataset/ folder, extract ArcFace embeddings for every student,
     save face_embeddings.pkl, and update the database.
-    Mirrors the logic in train_faces.py.
     """
     t0 = time.perf_counter()
     try:
@@ -259,7 +350,7 @@ async def train_model():
             FACE_TRAIN_OPS_TOTAL.labels(status="no_dataset").inc()
             raise HTTPException(status_code=404, detail="Dataset folder not found")
 
-        fa = get_face_app()
+        fa = get_face_app((640, 640))
 
         student_folders = [
             d for d in os.listdir(DATASET_PATH)
@@ -291,7 +382,8 @@ async def train_model():
                     continue
                 img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                faces = fa.get(img_rgb)
+                # Use multi-scale detection during training too
+                faces = _detect_multiscale(img_rgb)
                 if faces:
                     face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
                     person_embeddings.append(face.normed_embedding)
@@ -325,11 +417,9 @@ async def train_model():
         with open(EMBEDDINGS_FILE, "wb") as f:
             pickle.dump(face_dict, f)
 
-        # Increment bulk counters
         FACE_TRAIN_STUDENTS_PROCESSED_TOTAL.inc(len(face_dict))
         FACE_TRAIN_IMAGES_PROCESSED_TOTAL.inc(total_images)
 
-        # Optional: update DB embeddings
         _update_db_embeddings(face_dict)
 
         FACE_TRAIN_OPS_TOTAL.labels(status="success").inc()
@@ -342,10 +432,11 @@ async def train_model():
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         FACE_TRAIN_OPS_TOTAL.labels(status="error").inc()
         FACE_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/api/train").inc()
-        raise
+        logger.exception("train_model error")
+        raise HTTPException(status_code=500, detail=str(exc))
     finally:
         FACE_TRAIN_OP_DURATION_SECONDS.observe(time.perf_counter() - t0)
 
@@ -399,7 +490,7 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 async def recognize_faces(
     courseId: str = Form(...),
     frames: list[UploadFile] = File(...),
-    confidence_threshold: float = Form(0.45),
+    confidence_threshold: float = Form(0.38),  # lowered from 0.45 — helps at distance
 ):
     """
     Accept classroom frame images, run ArcFace recognition against the
@@ -421,7 +512,6 @@ async def recognize_faces(
             FACE_RECOGNIZE_OPS_TOTAL.labels(status="empty_embeddings").inc()
             raise HTTPException(status_code=422, detail="Trained embeddings file is empty")
 
-        fa = get_face_app()
         os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
         # Clear old output
@@ -445,17 +535,10 @@ async def recognize_faces(
                 logger.warning(f"[recognize] Frame {idx} could not be decoded, skipping")
                 continue
 
-            # Try original + brightness-enhanced
-            face_candidates: list = []
-            for variant in [img, _enhance(img)]:
-                try:
-                    detected = fa.get(cv2.cvtColor(variant, cv2.COLOR_BGR2RGB))
-                    face_candidates.extend(detected)
-                except Exception as e:
-                    logger.debug(f"Detection error on variant: {e}")
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            # Deduplicate overlapping bboxes (IoU > 0.7)
-            unique_faces = _deduplicate_faces(face_candidates)
+            # Multi-scale + multi-variant detection for distant faces
+            unique_faces = _detect_multiscale(img_rgb)
 
             recognized_in_frame: set[str] = set()
             for face_idx, face in enumerate(unique_faces):
@@ -488,13 +571,11 @@ async def recognize_faces(
                     FACE_RECOGNIZE_CONFIDENCE.observe(best_sim)
                     logger.info(f"[recognize] ✓ {best_match} ({best_sim:.3f}) in frame {idx}")
 
-            # Save annotated frame
             _save_annotated(img, unique_faces, known_faces, f"frame_{idx:03d}.jpg",
                             confidence_threshold, OUTPUT_FOLDER)
 
         avg_conf = float(np.mean(confidences)) if confidences else 0.0
 
-        # Bulk counter increments
         FACE_RECOGNIZE_FACES_DETECTED_TOTAL.inc(total_faces)
         FACE_RECOGNIZE_STUDENTS_MATCHED_TOTAL.inc(len(recognized_students))
         FACE_RECOGNIZE_FRAMES_PROCESSED_TOTAL.inc(len(frames))
@@ -510,10 +591,11 @@ async def recognize_faces(
         }
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         FACE_RECOGNIZE_OPS_TOTAL.labels(status="error").inc()
         FACE_UNHANDLED_ERRORS_TOTAL.labels(endpoint="/api/recognize").inc()
-        raise
+        logger.exception("recognize_faces error")
+        raise HTTPException(status_code=500, detail=str(exc))
     finally:
         FACE_RECOGNIZE_OP_DURATION_SECONDS.observe(time.perf_counter() - t0)
 
@@ -523,12 +605,13 @@ async def recognize_faces(
 # ---------------------------------------------------------------------------
 
 def _enhance(img: np.ndarray) -> np.ndarray:
+    """PIL-based brightness/contrast/sharpness boost. Returns BGR image."""
     try:
         from PIL import Image, ImageEnhance
         pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        pil = ImageEnhance.Brightness(pil).enhance(1.2)
-        pil = ImageEnhance.Contrast(pil).enhance(1.5)
-        pil = ImageEnhance.Sharpness(pil).enhance(1.3)
+        pil = ImageEnhance.Brightness(pil).enhance(1.3)
+        pil = ImageEnhance.Contrast(pil).enhance(1.6)
+        pil = ImageEnhance.Sharpness(pil).enhance(1.5)
         return cv2.cvtColor(np.array(pil), cv2.COLOR_RGB2BGR)
     except Exception:
         return img
