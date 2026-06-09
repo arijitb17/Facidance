@@ -151,9 +151,9 @@ def _preprocess_for_detection(img: np.ndarray) -> list[np.ndarray]:
     # CLAHE — equalises local contrast, best for dim/backlit distant faces
     try:
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
+        l_chan, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        l_eq = clahe.apply(l)
+        l_eq = clahe.apply(l_chan)
         lab_eq = cv2.merge([l_eq, a, b])
         variants.append(cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR))
     except Exception:
