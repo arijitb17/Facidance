@@ -169,7 +169,8 @@ jobs:
           script: |
             set -e
             cd /opt/facidance
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             # Upsert GROQ_API_KEY in .env on the VPS
             grep -q "^GROQ_API_KEY=" .env \
