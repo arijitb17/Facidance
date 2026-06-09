@@ -649,8 +649,8 @@ async def _do_submit_attendance(
         f"teacher:stats:{course.teacherId}",
         f"teacher:courses:{course.teacherId}",
         f"student:attendance:*:{course_id}",
-        f"student:stats:*",
-        f"student:history:*",
+        "student:stats:*",
+        "student:history:*",
     )
 
     return {
@@ -1086,8 +1086,6 @@ async def get_teacher_students(user_id: str, course_id: Optional[str] = None) ->
     )
 
     student_map: dict[str, dict] = {}
-    # Collect the course IDs we're displaying so we can scope attendance
-    displayed_course_ids = [c.id for c in courses]
 
     for course in courses:
         for s in (course.students or []):
