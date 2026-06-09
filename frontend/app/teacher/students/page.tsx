@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Search, Upload, X, AlertCircle, Users,
-  UserCheck, UserX, ChevronDown, Filter, UserPlus, Check
+  UserCheck, UserX, ChevronDown, Filter, UserPlus
 } from "lucide-react";
 import { useToast } from "@/lib/useToast";
 import { ToastContainer } from "@/components/ToastContainer";
