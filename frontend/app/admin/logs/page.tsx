@@ -11,7 +11,6 @@ const SERVICES = [
   "facidance-frontend",
   "facidance-student",
   "facidance-teacher",
-  "facidance-tunnel",
 ];
 
 const EASE_ALL = "all 0.25s cubic-bezier(.22,.68,0,1.2)";
@@ -186,7 +185,7 @@ export default function AdminLogsPage() {
             <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#10b981" }} />
           </div>
           <span style={{ margin: "0 auto", fontSize: 12, fontWeight: 600, color: "#94a3b8", fontFamily: "monospace" }}>
-            ~/.pm2/logs/{service}-{logType}.log
+            docker logs {service}-1
           </span>
           <button 
             onClick={() => setLogs([])}
