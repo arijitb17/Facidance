@@ -164,7 +164,7 @@ When contributing, ensure that all new endpoints are added to their respective m
 This project is licensed under the **MIT License**.
 
 ## 👨‍💻 Author
-**Monaswi** — [@Monaswi0104](https://github.com/Monaswi0104)
+**Arijit** — [@arijitb17](https://github.com/arijitb17)
 
 ---
 
