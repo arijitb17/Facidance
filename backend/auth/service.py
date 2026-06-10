@@ -113,7 +113,7 @@ async def login(data: LoginRequest) -> dict:
         }
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
         AUTH_UNHANDLED_ERRORS_TOTAL.labels(endpoint="login").inc()
         raise
     finally:
