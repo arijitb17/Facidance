@@ -59,43 +59,35 @@ OUTPUT_FOLDER   = os.path.join(BASE_DIR, "backend", "output")
 EMBEDDINGS_FILE = os.path.join(BASE_DIR, "backend", "face_embeddings.pkl")
 
 # ---------------------------------------------------------------------------
-# Detection sizes to try in order — large first for close faces,
-# smaller sizes catch distant/small faces that buffalo_l misses at 640
-# ---------------------------------------------------------------------------
-DETECTION_SIZES = [(640, 640), (480, 480), (320, 320)]
-
-
-# ---------------------------------------------------------------------------
 # Lazy-load InsightFace once at startup (heavy model)
 # ---------------------------------------------------------------------------
-_face_apps: dict = {}   # keyed by det_size tuple
+_face_app = None
 
-
-def get_face_app(det_size: tuple = (640, 640)):
-    """Return a FaceAnalysis instance for the given det_size, loading once."""
-    global _face_apps
-    if det_size not in _face_apps:
+def get_face_app():
+    """Return a FaceAnalysis instance, loading once."""
+    global _face_app
+    if _face_app is None:
         t0 = time.perf_counter()
         try:
             from insightface.app import FaceAnalysis
             fa = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
-            fa.prepare(ctx_id=0, det_size=det_size)
-            _face_apps[det_size] = fa
+            fa.prepare(ctx_id=0, det_size=(640, 640))
+            _face_app = fa
             FACE_MODEL_LOAD_TOTAL.labels(status="success").inc()
-            logger.info(f"InsightFace model loaded (det_size={det_size})")
+            logger.info("InsightFace model loaded (det_size=(640, 640))")
         except Exception:
             FACE_MODEL_LOAD_TOTAL.labels(status="error").inc()
             raise
         finally:
             FACE_MODEL_LOAD_DURATION_SECONDS.observe(time.perf_counter() - t0)
-    return _face_apps[det_size]
+    return _face_app
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Pre-warm primary model on startup so first request isn't slow
     try:
-        get_face_app((640, 640))
+        get_face_app()
     except Exception as e:
         logger.warning(f"Could not pre-warm face model: {e}")
     yield
@@ -167,22 +159,17 @@ def _preprocess_for_detection(img: np.ndarray) -> list[np.ndarray]:
 
 def _detect_multiscale(img_rgb: np.ndarray) -> list:
     """
-    Try multiple det_sizes and image variants; return deduplicated face list.
-    This significantly improves recall for small/distant faces.
+    Try multiple image variants with the single loaded model.
     """
     all_faces: list = []
-    for det_size in DETECTION_SIZES:
-        fa = get_face_app(det_size)
-        for variant_bgr in _preprocess_for_detection(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)):
-            variant_rgb = cv2.cvtColor(variant_bgr, cv2.COLOR_BGR2RGB)
-            try:
-                detected = fa.get(variant_rgb)
-                all_faces.extend(detected)
-            except Exception as e:
-                logger.debug(f"Detection error (det_size={det_size}): {e}")
-        # If we already found faces at this scale, no need to go smaller
-        if _deduplicate_faces(all_faces):
-            break
+    fa = get_face_app()
+    for variant_bgr in _preprocess_for_detection(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)):
+        variant_rgb = cv2.cvtColor(variant_bgr, cv2.COLOR_BGR2RGB)
+        try:
+            detected = fa.get(variant_rgb)
+            all_faces.extend(detected)
+        except Exception as e:
+            logger.debug(f"Detection error: {e}")
     return _deduplicate_faces(all_faces)
 
 
@@ -228,7 +215,7 @@ async def get_student_photos(student_id: str):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/process-student", tags=["Training"])
-async def process_student(
+def process_student(
     studentId: str = Form(...),
     front: UploadFile = File(...),
     left:  UploadFile = File(...),
@@ -249,7 +236,7 @@ async def process_student(
 
         results = {}
         for pose, upload in [("front", front), ("left", left), ("right", right)]:
-            raw = await upload.read()
+            raw = upload.file.read()
             if not raw:
                 FACE_PROCESS_STUDENT_OPS_TOTAL.labels(status="empty_upload").inc()
                 raise HTTPException(
@@ -327,7 +314,7 @@ async def process_student(
 # ---------------------------------------------------------------------------
 
 @app.post("/api/train", tags=["Training"])
-async def train_model():
+def train_model():
     """
     Walk dataset/ folder, extract ArcFace embeddings for every student,
     save face_embeddings.pkl, and update the database.
@@ -350,7 +337,7 @@ async def train_model():
             FACE_TRAIN_OPS_TOTAL.labels(status="no_dataset").inc()
             raise HTTPException(status_code=404, detail="Dataset folder not found")
 
-        fa = get_face_app((640, 640))
+        fa = get_face_app()
 
         student_folders = [
             d for d in os.listdir(DATASET_PATH)
@@ -487,7 +474,7 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 @app.post("/api/recognize", tags=["Recognition"])
-async def recognize_faces(
+def recognize_faces(
     courseId: str = Form(...),
     frames: list[UploadFile] = File(...),
     confidence_threshold: float = Form(0.38),  # lowered from 0.45 — helps at distance
@@ -528,7 +515,7 @@ async def recognize_faces(
         confidences: list[float] = []
 
         for idx, frame_upload in enumerate(frames):
-            raw = await frame_upload.read()
+            raw = frame_upload.file.read()
             arr = np.frombuffer(raw, dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if img is None:
