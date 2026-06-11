@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen, Users, CheckCircle2, AlertCircle, Camera,
-  GraduationCap, PlayCircle, Sparkles, Search, X, ChevronRight,
+  GraduationCap, PlayCircle, Sparkles, Search, X,
 } from "lucide-react";
 import {
   teacherHierarchyApi, teacherCoursesApi,
@@ -153,7 +153,6 @@ export default function TeacherAttendance() {
   const [loadingHierarchy, setLoadingHierarchy] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<FlattenedCourse | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [students, setStudents] = useState<CourseStudentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isStartingTraining, setIsStartingTraining] = useState(false);
@@ -212,7 +211,6 @@ export default function TeacherAttendance() {
   function handleCourseSelect(course: FlattenedCourse) {
     setSelectedCourse(course);
     setSearchQuery("");
-    setShowDropdown(false);
     fetchCourseStudents(course.id);
   }
 
@@ -312,13 +310,13 @@ export default function TeacherAttendance() {
               </div>
             </div>
 
-            <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 0 }}>
+            <div style={{ padding: "0 28px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
               {/* Search input */}
               <div style={{
                 display: "flex", alignItems: "center", gap: 10,
                 background: "#f8fafc",
                 border: `1px solid ${searchFocused ? C.borderHov : C.border}`,
-                borderRadius: showDropdown && filteredCourses.length > 0 ? "11px 11px 0 0" : 11,
+                borderRadius: 11,
                 padding: "10px 14px",
                 boxShadow: searchFocused ? `0 0 0 3px rgba(15,164,175,0.1)` : SHADOW.rest,
                 transition: "border-color 0.2s, box-shadow 0.2s",
@@ -326,16 +324,15 @@ export default function TeacherAttendance() {
                 <Search size={14} color={searchFocused ? C.accent : C.mutedLight} style={{ flexShrink: 0, transition: EASE_ALL }} />
                 <input
                   value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
-                  onFocus={() => { setShowDropdown(true); setSearchFocused(true); }}
-                  onBlur={() => { setTimeout(() => { setShowDropdown(false); setSearchFocused(false); }, 300); }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
                   placeholder="Search by course name, department, program, or semester…"
                   style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13.5, color: C.text }}
                 />
                 {searchQuery && (
                   <button
-                    onMouseDown={(e) => e.preventDefault()} // prevent blur before click
-                    onClick={() => { setSearchQuery(""); setShowDropdown(false); }}
+                    onClick={() => setSearchQuery("")}
                     style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}
                   >
                     <X size={13} color={C.mutedLight} />
@@ -343,36 +340,24 @@ export default function TeacherAttendance() {
                 )}
               </div>
 
-              {/* ── DROPDOWN — onMouseDown preventDefault is the key fix ── */}
-              {showDropdown && filteredCourses.length > 0 && (
-                <div
-                  onMouseDown={(e) => e.preventDefault()} // ← THIS prevents input blur before onClick fires
-                  style={{
-                    border: `1px solid ${C.borderHov}`, borderTop: "none",
-                    borderRadius: "0 0 11px 11px",
-                    maxHeight: 300, overflowY: "auto",
-                    boxShadow: "0 12px 32px rgba(0,49,53,0.1)",
-                    background: C.white,
-                  }}
-                >
-                  {filteredCourses.map((course, idx) => (
-                    <CourseOption
+              {/* Cards Grid */}
+              {filteredCourses.length > 0 ? (
+                <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+                  {filteredCourses.map((course) => (
+                    <CourseCard
                       key={course.id}
                       course={course}
-                      isLast={idx === filteredCourses.length - 1}
                       onSelect={handleCourseSelect}
                     />
                   ))}
                 </div>
-              )}
-
-              {showDropdown && searchQuery && filteredCourses.length === 0 && (
+              ) : (
                 <div style={{
-                  border: `1px solid ${C.border}`, borderTop: "none",
-                  borderRadius: "0 0 11px 11px", padding: "20px 16px",
-                  textAlign: "center", background: C.white,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 11, padding: "30px 16px",
+                  textAlign: "center", background: "#f8fafc",
                 }}>
-                  <p style={{ fontSize: 13, color: C.body }}>No courses found for "{searchQuery}"</p>
+                  <p style={{ fontSize: 14, color: C.body }}>No courses found for "{searchQuery}"</p>
                 </div>
               )}
             </div>
@@ -546,8 +531,8 @@ export default function TeacherAttendance() {
   );
 }
 
-function CourseOption({ course, isLast, onSelect }: {
-  course: FlattenedCourse; isLast: boolean; onSelect: (c: FlattenedCourse) => void;
+function CourseCard({ course, onSelect }: {
+  course: FlattenedCourse; onSelect: (c: FlattenedCourse) => void;
 }) {
   const [hov, setHov] = useState(false);
   return (
@@ -556,21 +541,28 @@ function CourseOption({ course, isLast, onSelect }: {
       onMouseLeave={() => setHov(false)}
       onClick={() => onSelect(course)}
       style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        display: "flex", flexDirection: "column", alignItems: "flex-start",
         width: "100%", textAlign: "left",
-        padding: "12px 16px",
-        background: hov ? "#f0f9fa" : "transparent",
-        border: "none", borderBottom: isLast ? "none" : `1px solid ${C.border}`,
-        cursor: "pointer", transition: `background 0.15s ease`,
+        padding: "18px", borderRadius: 14,
+        background: hov ? "#f0f9fa" : C.white,
+        border: `1px solid ${hov ? C.borderHov : C.border}`,
+        boxShadow: hov ? SHADOW.hover : "0 2px 8px rgba(0,0,0,0.02)",
+        cursor: "pointer", transition: EASE_ALL,
+        transform: hov ? "translateY(-3px)" : "none",
       }}
     >
-      <div>
-        <p style={{ fontSize: 13.5, fontWeight: 700, color: hov ? C.primary : C.text, letterSpacing: "-0.01em", transition: EASE_ALL }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+        <div style={{
+          height: 34, width: 34, borderRadius: 10, background: "rgba(15,164,175,0.1)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <BookOpen size={16} color={C.accent} />
+        </div>
+        <p style={{ fontSize: 14.5, fontWeight: 700, color: hov ? C.primary : C.text, letterSpacing: "-0.01em", lineHeight: 1.3 }}>
           {course.name}
         </p>
-        <p style={{ fontSize: 11.5, color: C.body, marginTop: 3 }}>{course.displayPath}</p>
       </div>
-      <ChevronRight size={14} color={C.accent} style={{ opacity: hov ? 1 : 0.3, flexShrink: 0, transition: EASE_ALL }} />
+      <p style={{ fontSize: 12, color: C.body, lineHeight: 1.45 }}>{course.displayPath}</p>
     </button>
   );
 }
