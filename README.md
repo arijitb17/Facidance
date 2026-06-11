@@ -78,6 +78,19 @@ Facidance utilizes a robust Deep Learning pipeline to ensure accurate and secure
 
 ## 🏗 Architecture
 
+<p align="center">
+  <img src="assets/website-architecture.png" alt="Website Architecture" width="800" />
+</p>
+
+### Deployment Model
+<p align="center">
+  <img src="assets/deployment-architecture.png" alt="Deployment Architecture" width="800" />
+</p>
+
+---
+
+### Microservices Breakdown
+
 The backend is strictly divided into **5 independent FastAPI microservices** for high availability and scalability:
 
 1. **Frontend UI** (Next.js) - Port `3000`
