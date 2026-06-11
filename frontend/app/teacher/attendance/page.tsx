@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen, Users, CheckCircle2, AlertCircle, Camera,
-  GraduationCap, PlayCircle, Sparkles, Search, X, ChevronRight,
+  GraduationCap, PlayCircle, Sparkles, Search, X,
 } from "lucide-react";
 import {
   teacherHierarchyApi, teacherCoursesApi,
@@ -153,7 +153,6 @@ export default function TeacherAttendance() {
   const [loadingHierarchy, setLoadingHierarchy] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<FlattenedCourse | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [students, setStudents] = useState<CourseStudentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isStartingTraining, setIsStartingTraining] = useState(false);
@@ -212,7 +211,6 @@ export default function TeacherAttendance() {
   function handleCourseSelect(course: FlattenedCourse) {
     setSelectedCourse(course);
     setSearchQuery("");
-    setShowDropdown(false);
     fetchCourseStudents(course.id);
   }
 
