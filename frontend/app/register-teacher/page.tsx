@@ -275,7 +275,7 @@ export default function RegisterTeacherPage() {
           }}>
             {[
               { val: "1500+", lbl: "Students" },
-              { val: "98.2%",  lbl: "Accuracy" },
+              { val: "97.7%",  lbl: "Accuracy" },
               { val: "10+",   lbl: "Courses"  },
             ].map(({ val, lbl }, i, arr) => (
               <div key={lbl} style={{
